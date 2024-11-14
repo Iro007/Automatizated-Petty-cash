@@ -131,10 +131,13 @@ def extraer_texto(text_read):
 
 # -------------- Frontend code ----------------
 
+# Crear la carpeta 'invoices' si no existe
+os.makedirs('invoices', exist_ok=True)
+
 # title
 st.title("Automatizated Petty cash")
 
-# section invoice info
+# Sección de información de la factura
 with st.container():
     cc1, cc2 = st.columns(2)
     cc1.image(url_logo, width=100)
@@ -182,6 +185,12 @@ if st.button("Crear archivo Excel"):
 
                     # Añadir los datos extraídos a la lista
                     all_data.append([proveedor, fecha, factura, monto])
+
+                    # Mover el archivo de imagen procesado a la carpeta processed_invoices
+                    processed_folder = 'processed_invoices'
+                    os.makedirs(processed_folder, exist_ok=True)
+                    new_file_path = os.path.join(processed_folder, os.path.basename(file))
+                    os.rename(file, new_file_path)
                 else:
                     st.error(f"Error procesando el archivo {file}: Datos extraídos son incompletos.")
             except Exception as e:
@@ -218,8 +227,8 @@ if st.button("Crear archivo Excel"):
 
             # Aplicar el formato de moneda en dólares a la columna K
             for row in range(start_row, worksheet.max_row + 1):
-                    cell = worksheet.cell(row=row, column=11)  # Columna K es la columna 11
-                    cell.number_format = '[$$-409]#.##0,00'  # Formato de moneda en dólares
+                cell = worksheet.cell(row=row, column=11)  # Columna K es la columna 11
+                cell.number_format = '[$$-409]#.##0,00'  # Formato de moneda en dólares
 
             # Asegurarnos de que la celda K11 tenga el formato correcto
             worksheet['K11'].number_format = '[$$-409]#.##0,00'
@@ -241,9 +250,4 @@ if st.button("Crear archivo Excel"):
                     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 )
 
-extraer_texto_de_imagenes(folder_path)
-
-st.warning("Cambiar el precio del dolar al del dia en la casilla de la suma total en dolares")
-
-
-# Funcion para diferenciar local vs servidor
+st.warning("Cambiar el precio del dolar al del día en la casilla de la suma total en dólares")
