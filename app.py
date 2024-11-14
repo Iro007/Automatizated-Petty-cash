@@ -131,8 +131,10 @@ def extraer_texto(text_read):
 
 # -------------- Frontend code ----------------
 
-# Crear la carpeta 'invoices' si no existe
+# Crear las carpetas necesarias si no existen
 os.makedirs('invoices', exist_ok=True)
+os.makedirs('processed_invoices', exist_ok=True)
+os.makedirs('caja_chica', exist_ok=True)
 
 # title
 st.title("Automatizated Petty cash")
@@ -187,9 +189,7 @@ if st.button("Crear archivo Excel"):
                     all_data.append([proveedor, fecha, factura, monto])
 
                     # Mover el archivo de imagen procesado a la carpeta processed_invoices
-                    processed_folder = 'processed_invoices'
-                    os.makedirs(processed_folder, exist_ok=True)
-                    new_file_path = os.path.join(processed_folder, os.path.basename(file))
+                    new_file_path = os.path.join('processed_invoices', os.path.basename(file))
                     os.rename(file, new_file_path)
                 else:
                     st.error(f"Error procesando el archivo {file}: Datos extraídos son incompletos.")
@@ -250,4 +250,4 @@ if st.button("Crear archivo Excel"):
                     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                 )
 
-st.warning("Cambiar el precio del dolar al del día en la casilla de la suma total en dólares")
+st.warning("Cambiar el precio del dólar al del día en la casilla de la suma total en dólares")
