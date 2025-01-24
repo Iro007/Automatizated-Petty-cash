@@ -2,14 +2,15 @@
  
 ----
 
-![Logo [removed]](assets\Imagen1.png#)
+![Logo [removed]](assets/Imagen1.png)
+
 
 ## Descripción
 La aplicación Automatizated Petty Cash está diseñada para simplificar la gestión de fondos menores llamados cajas chicas en la compañia [removed], permitiendo a los usuarios registrar y monitorear transacciones de manera eficiente y segura. Desarrollada usando Streamlit, esta herramienta proporciona una interfaz amigable y reportes personalizados para mantener un control financiero transparente.
 
 ## Capturas de Pantalla
 ### Inicio
-![Inicio](assets\Captura.JPG)
+![Captura del program](assets/Captura.JPG)
 
 ## Características
 - **Automatización de Transacciones:** Registro automático de ingresos y gastos mediante fotos de facturas.
