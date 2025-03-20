@@ -8,10 +8,10 @@ import pytesseract
 import numpy as np
 import openpyxl
 from datetime import datetime
-import cv2
+#import cv2
 import base64
 import requests
-from openai import OpenAI
+#from openai import OpenAI
 
 
 # -------------- SETTINGS --------------
