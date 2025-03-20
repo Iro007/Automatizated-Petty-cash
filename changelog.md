@@ -6,6 +6,10 @@ Todas las notas importantes sobre los cambios en este proyecto se documentarán 
 Cambios futuros
 - Agregar mejoras en los patrones de busqueda
 - Scrapear tasa del dolar 
+- Agregar bot que manda a tu whatsapp el archivo
+
+## [1.0.1] - 2025-03-18
+### Añadido
 - Colocar en mayusculas las primeras letra de una palabra y las demas en minusculas
 
 ## [1.0.0] - 2025-01-24

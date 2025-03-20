@@ -1,3 +1,4 @@
+# Importaciones necesarias
 import streamlit as st
 import pandas as pd
 import re
@@ -7,6 +8,10 @@ import pytesseract
 import numpy as np
 import openpyxl
 from datetime import datetime
+import cv2
+import base64
+import requests
+from openai import OpenAI
 
 
 # -------------- SETTINGS --------------
@@ -84,7 +89,13 @@ def extraer_proveedor(text_read):
 
     # Si es una factura, usar el nombre del lugar. Si es un pago móvil, usar el concepto o 'Pago móvil'.
     nombre_lugar_proveedor = nombre_lugar if nombre_lugar else proveedor
+
+    # Formatear el proveedor para que solo la primera letra sea mayúscula
+    if nombre_lugar_proveedor:
+        nombre_lugar_proveedor = nombre_lugar_proveedor.capitalize()
+    
     return nombre_lugar_proveedor
+
 
 def extraer_fecha(text_read):
     # Patrón para extraer la fecha
@@ -248,6 +259,4 @@ if st.button("Crear archivo Excel"):
                     data=file,
                     file_name=updated_excel_path,
                     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                )
-
-st.warning("Cambiar el precio del dólar al del día en la casilla de la suma total en dólares")
+                )                
