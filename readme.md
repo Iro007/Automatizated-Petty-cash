@@ -96,6 +96,6 @@ Además se recorrió la demo en Chromium con imágenes sintéticas y se comprob�
 
 El [repositorio del proyecto](https://github.com/Iro007/Automatizated-Petty-cash) contiene el código fuente y las tres imágenes sintéticas de esta demo. El archivo de plantilla histórica y las capturas antiguas con identidad de empresa ya no forman parte del árbol actual del repositorio; se conservan localmente y están excluidos por `.gitignore`. Permanecen en el historial anterior de Git.
 
-No hay un despliegue web de esta versión verificado para compartir. Esta demo se ejecuta localmente.
+La demo también está disponible en [Streamlit](https://petty-cash-automatizated.streamlit.app/). Para esta versión se comprobó que la interfaz publicada carga desde la rama `main`; usa únicamente datos ficticios al probarla.
 
 
