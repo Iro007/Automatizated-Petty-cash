@@ -1,262 +1,311 @@
-# Importaciones necesarias
-import streamlit as st
-import pandas as pd
-import re
+"""Caja Chica Pro — front mejorado + plantilla Excel 100% propia.
+
+- Sin dependencia de base/caja_chica_base.xlsx
+- La planilla se genera desde cero con excel_builder.build_caja_chica
+- OCR tolerante a fallos + edición manual en tabla
+"""
+from __future__ import annotations
+
+import io
 import os
-from PIL import Image
-import pytesseract
-import numpy as np
-import openpyxl
-from datetime import datetime
-#import cv2
-import base64
-import requests
-#from openai import OpenAI
+from datetime import date, datetime
 
+import pandas as pd
+import streamlit as st
 
-# -------------- SETTINGS --------------
+from excel_builder import build_caja_chica, validar_fecha_gasto
+from ocr_utils import extraer_campos, ocr_imagen
 
-page_title = "Automatizated Petty cash"
-page_icon = "💳"  # emojis: https://www.webfx.com/tools/emoji-cheat-sheet/
-layout = "wide"
-euro_symbol = '\u20AC'
-total_expenses = 0
-final_price = 0
-df_expense = ""
-css = "style/main.css"
-url_logo = "assets/Imagen1.png"
-# Ruta a la carpeta de documentos
-folder_path = 'invoices'
-
+# ---------------- Config ----------------
 st.set_page_config(
-    page_title="Automatizated Petty cash",
-    page_icon=page_icon,
-    layout=layout,
+    page_title="Caja Chica Pro",
+    page_icon="🧾",
+    layout="wide",
     initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': 'https://valerapp.com/contact/',
-        'Report a bug': "https://valerapp.com/contact/",
-        'About': "# This is an *extremely* cool app!"
-    }
+    menu_items={"About": "### Caja Chica Pro\nGenera tu relación de gastos sin plantillas externas."},
 )
 
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+os.makedirs("invoices", exist_ok=True)
+os.makedirs("caja_chica", exist_ok=True)
 
-# Funciones
+CSS = """
+<style>
+#MainMenu, footer, header {visibility: hidden;}
+.block-container {padding-top: 1.2rem; max-width: 1250px;}
+.hero {
+  background: linear-gradient(135deg, #1F3864 0%, #2E75B6 60%, #5B9BD5 100%);
+  border-radius: 18px; padding: 26px 28px; color: white;
+  box-shadow: 0 10px 30px rgba(31,56,100,.25); margin-bottom: 18px;
+}
+.hero h1 {margin: 0; font-size: 2rem;}
+.hero p {margin: 6px 0 0 0; opacity: .92;}
+.card {
+  background: white; border: 1px solid #E5E7EB; border-radius: 14px;
+  padding: 16px 18px; box-shadow: 0 4px 14px rgba(0,0,0,.05);
+}
+.stButton > button {
+  border-radius: 10px; font-weight: 700; border: none;
+  background: linear-gradient(135deg, #1F3864, #2E75B6); color: white;
+  padding: .6rem 1.2rem;
+}
+.stButton > button:hover {filter: brightness(1.08);}
+.stDownloadButton > button {
+  border-radius: 10px; font-weight: 700;
+  background: #16a34a; color: white; border: none; padding: .6rem 1.2rem;
+}
+[data-testid="stMetric"] {
+  background: white; border: 1px solid #E5E7EB; border-radius: 14px; padding: 12px;
+}
+</style>
+"""
+st.markdown(CSS, unsafe_allow_html=True)
 
+COLS = ["proveedor", "fecha", "factura", "monto_bs", "descripcion"]
+PRETTY = {"proveedor": "Proveedor / Comercio", "fecha": "Fecha", "factura": "N° Factura / Ref.", "monto_bs": "Monto (Bs)", "descripcion": "Descripción"}
 
-def get_files_in_folder(folder_path):
-    files = []
-    # Itera sobre todos los archivos y subdirectorios en la carpeta
-    for root, dirs, filenames in os.walk(folder_path):
-        for filename in filenames:
-            # Añadir la ruta completa del archivo a la lista de archivos
-            files.append(os.path.join(root, filename))
-    return files
-
-def extraer_texto_de_imagenes(file_path):
-    try:
-        # Abre la imagen y extrae el texto
-        text_read = pytesseract.image_to_string(Image.open(file_path))
-        print(f'Texto extraído de {os.path.basename(file_path)}:')
-        print(text_read)
-        print('-' * 50)
-        # Aplicar las funciones para extraer la información
-        proveedor, fecha, factura, monto = extraer_texto(text_read)
-        return proveedor, fecha, factura, monto
-    except Exception as e:
-        print(f'Error procesando el archivo {file_path}: {e}')
-        return None, None, None, None
-
-
-def extraer_proveedor(text_read):        
-    # Patrón para extraer el concepto/proveedor para pago móvil
-    concepto_pattern = r'CONCEPTO\s*([^\n]+)'
-    concepto_match = re.search(concepto_pattern, text_read)
-    proveedor = concepto_match.group(1) if concepto_match else None
-    
-    # Patrón para extraer el nombre del lugar para facturas
-    lugar_pattern = r'IDENTIFICACION RECEPTOR\s[^\n]+\n([^\n]+)'
-    lugar_match = re.search(lugar_pattern, text_read)
-    nombre_lugar = lugar_match.group(1) if lugar_match else None
-
-    # Si es una factura, usar el nombre del lugar. Si es un pago móvil, usar el concepto o 'Pago móvil'.
-    nombre_lugar_proveedor = nombre_lugar if nombre_lugar else proveedor
-
-    # Formatear el proveedor para que solo la primera letra sea mayúscula
-    if nombre_lugar_proveedor:
-        nombre_lugar_proveedor = nombre_lugar_proveedor.capitalize()
-    
-    return nombre_lugar_proveedor
+if "gastos" not in st.session_state:
+    st.session_state.gastos = pd.DataFrame(columns=COLS)
+if "last_file" not in st.session_state:
+    st.session_state.last_file = None
+if "editor_version" not in st.session_state:
+    st.session_state.editor_version = 0
 
 
-def extraer_fecha(text_read):
-    # Patrón para extraer la fecha
-    fecha_pattern = r'FECHA\s*\n\s*(\d{2}/\d{2}/\d{4})'
-    fecha_match = re.search(fecha_pattern, text_read)
-    fecha = fecha_match.group(1) if fecha_match else None
-
-    # Convertir la fecha al formato dd/mm/yyyy (si es necesario)
-    if fecha:
-        try:
-            fecha = datetime.strptime(fecha, '%d/%m/%Y').strftime('%d/%m/%Y')
-        except ValueError:
-            pass
-    return fecha
+def df_gastos() -> pd.DataFrame:
+    df = st.session_state.gastos
+    if df.empty:
+        return pd.DataFrame(columns=COLS)
+    df = df.copy()
+    df["monto_bs"] = pd.to_numeric(df["monto_bs"], errors="coerce").fillna(0.0)
+    return df
 
 
-def extraer_factura(text_read):
-    # Patrón para extraer el número de referencia del pago móvil
-    factura_pattern = r'NUMERO DE REFERENCIA\s+[^\n]*\n(\d+)'
-    factura_match = re.search(factura_pattern, text_read)
-    factura = factura_match.group(1) if factura_match else None
-    return factura
-
-def extraer_monto(text_read):
-    # Patrón para extraer el monto en bolívares
-    monto_pattern = r'MONTO DE LA OPERACION\s*[^\n]*\nBs\.?\s*([\d\.]+,\d{2})'
-    monto_matches = re.findall(monto_pattern, text_read)
-    monto = monto_matches[-1].replace('.', '').replace(',', '.') if monto_matches else None  # Obtener el último monto encontrado
-    return monto    
-
-def extraer_texto(text_read):
-    proveedor = extraer_proveedor(text_read)
-    fecha = extraer_fecha(text_read)
-    factura = extraer_factura(text_read)
-    monto = extraer_monto(text_read)
-    
-    # Verificar que todos los datos hayan sido extraídos correctamente
-    if None in (proveedor, fecha, factura, monto):
-        raise ValueError("Datos extraídos son incompletos")
-    
-    return proveedor, fecha, factura, monto
+def totales(df: pd.DataFrame, tasa: float):
+    total_bs = float(df["monto_bs"].sum()) if not df.empty else 0.0
+    total_usd = (total_bs / tasa) if tasa else 0.0
+    return total_bs, total_usd
 
 
+# ---------------- Sidebar ----------------
+with st.sidebar:
+    st.markdown("### ⚙️ Configuración")
+    with st.expander("🏢 Empresa (sale en el Excel)", expanded=False):
+        emp_nombre = st.text_input("Nombre", value="MI EMPRESA C.A.")
+        emp_rif = st.text_input("RIF", value="RIF: J-00000000-0")
+        emp_dir = st.text_input("Dirección", value="Av. Principal, Ciudad, País")
+        emp_tel = st.text_input("Teléfonos", value="Tel: +58 000 000 0000")
+    with st.expander("👤 Responsable y montos", expanded=True):
+        responsable = st.text_input("Responsable", placeholder="Nombre y apellido")
+        cedula = st.text_input("Cédula", placeholder="V-12345678", max_chars=12)
+        monto_otorgado = st.number_input("Monto otorgado ($)", min_value=0.0, format="%.2f")
+        tasa = st.number_input("Tasa Bs/$ del día", min_value=0.0, format="%.2f", help="Se usa para convertir cada gasto a $ dentro del Excel con fórmulas vivas.")
+        fecha_emision = st.date_input("Fecha de emisión", value=date.today())
+        n_reporte = st.text_input("N° Reporte", value=datetime.now().strftime("%Y%m%d"))
+    st.divider()
+    st.caption("💡 La plantilla es propia: se genera por código, sin archivos base. Cambia los datos de empresa aquí y saldrán en el Excel.")
+    if st.button("🗑️ Vaciar tabla de gastos"):
+        st.session_state.gastos = pd.DataFrame(columns=COLS)
+        st.session_state.editor_version += 1
+        st.rerun()
 
-# -------------- Frontend code ----------------
+# ---------------- Hero ----------------
+st.markdown(
+    """<div class="hero">
+    <h1>🧾 Caja Chica Pro</h1>
+    <p>Sube tus comprobantes → revisa y corrige → genera tu planilla Excel propia con totales y firmas.</p>
+    </div>""",
+    unsafe_allow_html=True,
+)
 
-# Crear las carpetas necesarias si no existen
-os.makedirs('invoices', exist_ok=True)
-os.makedirs('processed_invoices', exist_ok=True)
-os.makedirs('caja_chica', exist_ok=True)
+tab1, tab2, tab3, tab4 = st.tabs(["📤 1. Cargar", "🧾 2. Revisar y editar", "📊 3. Resumen", "📥 4. Generar Excel"])
 
-# title
-st.title("Automatizated Petty cash")
+# ---------------- TAB 1 ----------------
+with tab1:
+    c1, c2 = st.columns([1.2, 1], gap="large")
+    with c1:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("Sube comprobantes")
+        files = st.file_uploader(
+            "Arrastra imágenes de pago móvil / facturas",
+            type=["png", "jpg", "jpeg", "webp"],
+            accept_multiple_files=True,
+            help="También puedes agregar gastos manualmente abajo si el OCR falla.",
+        )
+        if files:
+            st.write(f"**{len(files)}** archivo(s) listos para procesar:")
+            cols = st.columns(3)
+            for i, f in enumerate(files):
+                with cols[i % 3]:
+                    st.image(f, caption=f.name, use_container_width=True)
+        procesar = st.button("🔍 Procesar con OCR y agregar", disabled=not files)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# Sección de información de la factura
-with st.container():
-    cc1, cc2 = st.columns(2)
-    cc1.image(url_logo, width=100)
-    from_who = cc1.text_input("Responsable:", placeholder="Nombre del responsable")
-    cc2.subheader("Datos del responsable")
-    num_invoice = cc2.text_input("#", placeholder="Cédula del responsable", max_chars=8)
-    date_invoice = cc2.date_input("Fecha:")
-    due_date = cc2.number_input("Monto $:", min_value=0.0, format="%.2f")
-
-# Botón para subir fotos
-uploaded_files = st.file_uploader("Subir fotos", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
-
-# Mostrar archivos subidos
-if uploaded_files:
-    st.write("Archivos subidos:")
-    for uploaded_file in uploaded_files:
-        # Guardar archivo en la carpeta invoices
-        with open(os.path.join("invoices", uploaded_file.name), "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        st.success(f"Archivo guardado: {uploaded_file.name}")
-
-# Validar que todos los campos requeridos estén llenos
-if st.button("Crear archivo Excel"):
-    if not from_who:
-        st.error("El campo 'Responsable' es requerido.")
-    elif not num_invoice:
-        st.error("El campo 'Cédula del responsable' es requerido.")
-    elif not due_date:
-        st.error("El campo 'Monto $' es requerido.")
-    else:
-        st.success(f"Hola, {from_who}!")
-        folder_path = 'invoices'
-        files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
-
-        # Crear una lista para almacenar los datos extraídos
-        all_data = []
-
-        for file in files:
-            try:
-                proveedor, fecha, factura, monto = extraer_texto_de_imagenes(file)
-                if None not in (proveedor, fecha, factura, monto):
-                    # Asegurarse de que el monto se trata como un número
-                    if monto is not None:
-                        monto = float(monto)
-
-                    # Añadir los datos extraídos a la lista
-                    all_data.append([proveedor, fecha, factura, monto])
-
-                    # Mover el archivo de imagen procesado a la carpeta processed_invoices
-                    new_file_path = os.path.join('processed_invoices', os.path.basename(file))
-                    os.rename(file, new_file_path)
+        if procesar and files:
+            nuevos, fallos = [], []
+            prog = st.progress(0, text="Leyendo imágenes…")
+            for i, f in enumerate(files):
+                raw = f.getvalue()
+                texto, campos, err = ocr_imagen(raw, f.name)
+                if campos and (campos.get("monto_bs") or campos.get("factura")):
+                    campos["descripcion"] = f.name
+                    nuevos.append(campos)
                 else:
-                    st.error(f"Error procesando el archivo {file}: Datos extraídos son incompletos.")
-            except Exception as e:
-                st.error(f"Error procesando el archivo {file}: {e}")
+                    fallos.append(f.name)
+                    nuevos.append(
+                        {"proveedor": "Revisar manual", "fecha": date.today().strftime("%d/%m/%Y"), "factura": "", "monto_bs": 0.0, "descripcion": f.name}
+                    )
+                prog.progress((i + 1) / len(files), text=f"Procesando {i+1}/{len(files)}…")
+            prog.empty()
+            if nuevos:
+                st.session_state.gastos = pd.concat([df_gastos(), pd.DataFrame(nuevos, columns=COLS)], ignore_index=True)
+                st.session_state.editor_version += 1
+            st.success(f"✅ {len(nuevos)} gasto(s) agregados. Ve a la pestaña **Revisar y editar**.")
+            if fallos:
+                st.warning(f"⚠️ OCR incompleto en: {', '.join(fallos)}. Complétalos manualmente en la pestaña 2.")
 
-        # Abrir el archivo Excel base
-        base_excel_path = 'base/caja_chica_base.xlsx'
-        if not os.path.exists(base_excel_path):
-            st.error(f"El archivo base {base_excel_path} no existe.")
-        else:
-            workbook = openpyxl.load_workbook(base_excel_path)
-            worksheet = workbook.active
+    with c2:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("➕ Agregar gasto manual")
+        with st.form("manual", clear_on_submit=True):
+            m_prov = st.text_input("Proveedor / Comercio*")
+            m_fec = st.text_input("Fecha (dd/mm/aaaa)", value=date.today().strftime("%d/%m/%Y"))
+            m_fac = st.text_input("N° Factura / Referencia")
+            m_monto = st.number_input("Monto (Bs)*", min_value=0.0, format="%.2f")
+            m_desc = st.text_input("Descripción (opcional)")
+            if st.form_submit_button("Agregar a la tabla"):
+                if not m_prov or not m_monto:
+                    st.error("Proveedor y monto son obligatorios.")
+                else:
+                    try:
+                        fecha_manual = validar_fecha_gasto(m_fec)
+                    except ValueError as exc:
+                        st.error(str(exc))
+                    else:
+                        row = pd.DataFrame([{"proveedor": m_prov.strip().capitalize(), "fecha": fecha_manual, "factura": m_fac.strip(), "monto_bs": float(m_monto), "descripcion": m_desc.strip()}])
+                        st.session_state.gastos = pd.concat([df_gastos(), row], ignore_index=True)
+                        st.session_state.editor_version += 1
+                        st.success("Gasto agregado.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-            # Agregar la información del responsable, cédula, fecha actual y monto otorgado
-            worksheet['C9'] = from_who  # Nombre del responsable
-            worksheet['K9'] = num_invoice  # Cédula del responsable
-            worksheet['K10'] = datetime.now().strftime('%d/%m/%Y')  # Fecha actual
-            worksheet['K11'] = due_date  # Monto otorgado en $
+# ---------------- TAB 2 ----------------
+with tab2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("Edita antes de generar")
+    st.caption("Puedes corregir proveedor, fecha, referencia, monto y descripción. Marca filas y elimínalas si hace falta.")
+    df = df_gastos()
+    if df.empty:
+        st.info("Aún no hay gastos. Carga imágenes en la pestaña 1 o agrega uno manual.")
+    else:
+        editor_key = f"editor_{st.session_state.editor_version}"
+        if st.session_state.get("editor_base_version") != st.session_state.editor_version:
+            st.session_state.editor_base = df.copy()
+            st.session_state.editor_base_version = st.session_state.editor_version
+        edited = st.data_editor(
+            st.session_state.editor_base,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "proveedor": st.column_config.TextColumn(PRETTY["proveedor"], required=True),
+                "fecha": st.column_config.TextColumn(PRETTY["fecha"], help="dd/mm/aaaa"),
+                "factura": st.column_config.TextColumn(PRETTY["factura"]),
+                "monto_bs": st.column_config.NumberColumn(PRETTY["monto_bs"], format="%.2f", min_value=0),
+                "descripcion": st.column_config.TextColumn(PRETTY["descripcion"]),
+            },
+            key=editor_key,
+        )
+        # Keep the widget baseline fixed while edits accumulate or are reverted.
+        st.session_state.gastos = edited.reset_index(drop=True)
+        total_bs, total_usd = totales(edited, tasa or 0)
+        m1, m2, m3 = st.columns(3)
+        m1.metric("N° gastos", len(edited))
+        m2.metric("Total Bs", f"{total_bs:,.2f}")
+        m3.metric("Total $ (ref.)", f"{total_usd:,.2f}")
+        if (edited["monto_bs"] == 0).any():
+            st.warning("Hay filas con monto 0. Revísalas antes de generar.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-            # Comenzar a agregar datos desde la celda C14
-            start_row = 14
-            start_column = 3  # Columna C
+# ---------------- TAB 3 ----------------
+with tab3:
+    df = df_gastos()
+    if df.empty:
+        st.info("Sin datos para mostrar.")
+    else:
+        total_bs, total_usd = totales(df, tasa or 0)
+        saldo = float(monto_otorgado or 0) - total_usd
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Otorgado ($)", f"{float(monto_otorgado or 0):,.2f}")
+        c2.metric("Gastado (Bs)", f"{total_bs:,.2f}")
+        c3.metric("Gastado ($)", f"{total_usd:,.2f}")
+        c4.metric("Saldo ($)", f"{saldo:,.2f}", delta=f"{saldo:,.2f}")
+        st.divider()
+        g1, g2 = st.columns([1.4, 1])
+        with g1:
+            st.subheader("Gasto por proveedor (Bs)")
+            chart_df = df.groupby("proveedor", as_index=False)["monto_bs"].sum().sort_values("monto_bs", ascending=False).head(15)
+            st.bar_chart(chart_df.set_index("proveedor"))
+        with g2:
+            st.subheader("Detalle")
+            show = df.copy()
+            show.columns = [PRETTY[c] for c in COLS]
+            st.dataframe(show, use_container_width=True, hide_index=True)
 
-            # Agregar datos extraídos al archivo Excel base, aplicando formato de moneda a la columna F
-            for row_index, data in enumerate(all_data, start=start_row):
-                col_index = start_column
-                for value in data:
-                    cell = worksheet.cell(row=row_index, column=col_index, value=value)
-                    if col_index == 6 and value is not None:  # Columna F y si el valor no es None
-                        cell.number_format = '[$Bs S-VE] #,##0.00'  # Formato de moneda
-                    col_index += 1
-                    if col_index == 6:  # Ignorar la columna F
-                        col_index += 1
+# ---------------- TAB 4 ----------------
+with tab4:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("Generar planilla propia")
+    df = df_gastos()
+    errores = []
+    if not responsable:
+        errores.append("Falta el **Responsable** (barra lateral).")
+    if not cedula:
+        errores.append("Falta la **Cédula**.")
+    if not (monto_otorgado or 0):
+        errores.append("Falta el **Monto otorgado ($)**.")
+    if not (tasa or 0):
+        errores.append("Falta la **Tasa Bs/$** (se usa en las fórmulas del Excel).")
+    if df.empty:
+        errores.append("La tabla de gastos está vacía.")
+    else:
+        for idx, valor in enumerate(df["fecha"], start=1):
+            try:
+                validar_fecha_gasto(valor)
+            except ValueError as exc:
+                errores.append(f"Gasto {idx}: {exc} Corrige la fecha en **Revisar y editar**.")
+    if errores:
+        for e in errores:
+            st.error(e)
+    else:
+        total_bs, total_usd = totales(df, tasa)
+        st.success(f"Listo: {len(df)} gasto(s) • Total Bs {total_bs:,.2f} • Total $ {total_usd:,.2f} • Saldo $ {float(monto_otorgado)-total_usd:,.2f}")
+        if st.button("📄 Generar archivo Excel", type="primary"):
+            empresa = {"nombre": emp_nombre, "rif": emp_rif, "direccion": emp_dir, "telefonos": emp_tel}
+            wb = build_caja_chica(
+                df,
+                empresa=empresa,
+                responsable=responsable,
+                cedula=cedula,
+                fecha_emision=fecha_emision,
+                monto_otorgado_usd=float(monto_otorgado),
+                tasa_bcv=float(tasa),
+                n_reporte=n_reporte,
+            )
+            fname = f"caja_chica_{n_reporte}_{datetime.now().strftime('%Y-%m-%d_%H%M')}.xlsx"
+            out_path = os.path.join("caja_chica", fname)
+            wb.save(out_path)
+            buf = io.BytesIO()
+            wb.save(buf)
+            st.session_state.last_file = (fname, buf.getvalue(), out_path)
+            st.success(f"Guardado en: `{out_path}`")
+        if st.session_state.last_file:
+            fname, data, out_path = st.session_state.last_file
+            st.download_button(
+                "⬇️ Descargar caja chica (.xlsx)",
+                data=data,
+                file_name=fname,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            st.caption("El Excel trae fórmulas vivas: si cambias la tasa en la celda F8, los $ se recalculan solos. Revisa y firma al final.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-            # Aplicar el formato de moneda en dólares a la columna K
-            for row in range(start_row, worksheet.max_row + 1):
-                cell = worksheet.cell(row=row, column=11)  # Columna K es la columna 11
-                cell.number_format = '[$$-409]#.##0,00'  # Formato de moneda en dólares
-
-            # Asegurarnos de que la celda K11 tenga el formato correcto
-            worksheet['K11'].number_format = '[$$-409]#.##0,00'
-
-            # Obtener la fecha actual para usarla en el nombre del archivo
-            fecha_actual = datetime.now().strftime('%d-%m-%Y')
-
-            # Guardar los cambios en un nuevo archivo Excel con el nombre incluyendo la fecha
-            updated_excel_path = f'caja_chica/caja_chica_{fecha_actual}.xlsx'
-            workbook.save(updated_excel_path)
-            st.success(f"Datos agregados y guardados en: {updated_excel_path}")
-
-            # Botón para descargar el archivo Excel
-            with open(updated_excel_path, 'rb') as file:
-                btn = st.download_button(
-                    label="Descargar caja chica",
-                    data=file,
-                    file_name=updated_excel_path,
-                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                )                
+st.divider()
+st.caption("Caja Chica Pro • plantilla propia generada por código (sin base externa) • verifica siempre los montos antes de firmar.")

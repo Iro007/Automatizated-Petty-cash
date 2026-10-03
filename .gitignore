@@ -126,6 +126,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -165,3 +167,14 @@ cython_debug/
 #.idea/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# Local receipt files, generated workbooks and verification evidence
+invoices/
+processed_invoices/
+caja_chica/
+evidence/
+# Historical demo assets and spreadsheet contain a third-party company identity and contact details.
+# Keep the local files available, but do not track them in the public repository.
+base/caja_chica_base.xlsx
+assets/Captura.JPG
+assets/Imagen1.png

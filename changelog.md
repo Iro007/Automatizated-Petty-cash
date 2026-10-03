@@ -8,6 +8,12 @@ Cambios futuros
 - Scrapear tasa del dolar 
 - Agregar bot que manda a tu whatsapp el archivo
 
+## [2.0.0] - 2026-09-03
+### Cambiado
+- Nuevo front "Caja Chica Pro": hero, sidebar por secciones, 4 pestañas (Cargar / Revisar / Resumen / Generar), tabla editable, métricas y gráfico por proveedor.
+- Plantilla Excel 100% propia generada por código (`excel_builder.py`): sin depender de `base/caja_chica_base.xlsx`, empresa configurable, fórmulas vivas Bs/$ con tasa editable, totales, saldo, filtros, firmas e impresión apaisada.
+- OCR robusto en `ocr_utils.py` con múltiples patrones y alta manual; `requirements.txt` limpio y tema actualizado.
+
 ## [1.0.1] - 2025-03-18
 ### Añadido
 - Colocar en mayusculas las primeras letra de una palabra y las demas en minusculas
