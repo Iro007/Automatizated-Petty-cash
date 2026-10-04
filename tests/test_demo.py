@@ -62,6 +62,10 @@ def action(at, key):
     return next(item for item in at.button if item.label == label)
 
 
+def method_selector(at):
+    return at.radio(key=f'upload_method_{at.session_state["language"]}')
+
+
 st.cache_data.clear()
 bcv_mock = patch("bcv_rate.urlopen", side_effect=lambda *_args, **_kwargs: FakeResponse())
 urlopen_mock = bcv_mock.start()
@@ -85,9 +89,9 @@ record(
 )
 record(
     "receipt_method_is_default_and_hides_manual_fields",
-    at.radio(key="upload_method").value == "receipts"
+    method_selector(at).value == "receipts"
     and not any(item.key == "manual_supplier" for item in at.text_input),
-    {"method": at.radio(key="upload_method").value, "text_input_keys": [item.key for item in at.text_input]},
+    {"method": method_selector(at).value, "text_input_keys": [item.key for item in at.text_input]},
 )
 issue_date_field = text_input(at, "Fecha de emisión (dd/mm/aaaa)")
 record("issue_date_defaults_to_venezuelan_format", re.fullmatch(r"\d{2}/\d{2}/\d{4}", issue_date_field.value) is not None, issue_date_field.value)
@@ -97,7 +101,17 @@ record("bcv_fetch_is_cached_during_session", urlopen_mock.call_count == 1, urlop
 action(at, "rate_refresh").click().run()
 record("explicit_bcv_refresh_bypasses_cache", urlopen_mock.call_count == 2, urlopen_mock.call_count)
 
-at.radio(key="upload_method").set_value("manual").run()
+receipt_method_states = []
+at.radio(key="language").set_value("en").run()
+receipt_method_states.append(method_selector(at).value == "receipts" and at.session_state["input_method"] == "receipts")
+at.toggle(key="dark_mode").set_value(True).run()
+receipt_method_states.append(method_selector(at).value == "receipts" and not any(item.key == "manual_supplier" for item in at.text_input))
+at.radio(key="language").set_value("es").run()
+receipt_method_states.append(method_selector(at).value == "receipts" and at.session_state["input_method"] == "receipts")
+at.toggle(key="dark_mode").set_value(False).run()
+record("receipt_method_survives_language_and_theme_switch", all(receipt_method_states), receipt_method_states)
+
+method_selector(at).set_value("manual").run()
 at.radio(key="language").set_value("en").run()
 record(
     "manual_language_switch_translates_ui",
@@ -133,13 +147,28 @@ record(
     and at.text_input(key="manual_amount").value == "10,00",
     {item.key: item.value for item in at.text_input if item.key.startswith("manual_")},
 )
-at.radio(key="upload_method").set_value("receipts").run()
+manual_method_states = []
+at.radio(key="language").set_value("en").run()
+manual_method_states.append(method_selector(at).value == "manual" and at.session_state["input_method"] == "manual")
+at.toggle(key="dark_mode").set_value(True).run()
+manual_method_states.append(method_selector(at).value == "manual" and at.text_input(key="manual_supplier").value == "Proveedor ficticio")
+at.radio(key="language").set_value("es").run()
+manual_method_states.append(method_selector(at).value == "manual" and at.session_state["input_method"] == "manual")
+at.toggle(key="dark_mode").set_value(False).run()
+record(
+    "manual_method_and_draft_survive_language_and_theme_switch",
+    all(manual_method_states)
+    and at.text_input(key="manual_expense_date").value == "31/02/2026"
+    and at.text_input(key="manual_amount").value == "10,00",
+    {"method_states": manual_method_states, "draft": {item.key: item.value for item in at.text_input if item.key.startswith("manual_")}},
+)
+method_selector(at).set_value("receipts").run()
 record(
     "receipts_method_hides_manual_draft",
     not any(item.key == "manual_supplier" for item in at.text_input),
     [item.key for item in at.text_input],
 )
-at.radio(key="upload_method").set_value("manual").run()
+method_selector(at).set_value("manual").run()
 record(
     "manual_draft_survives_method_switch",
     at.text_input(key="manual_supplier").value == "Proveedor ficticio"

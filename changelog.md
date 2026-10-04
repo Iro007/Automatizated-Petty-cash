@@ -12,6 +12,8 @@ Todas las notas importantes sobre los cambios en este proyecto se documentarán 
 - Cabecera compacta con idioma y modo oscuro; navegación de cuatro pasos con etiquetas breves.
 - Selección entre comprobantes y gasto manual para mostrar un formulario a la vez; referencia y descripción se agrupan como detalles opcionales.
 - Datos del reporte, empresa opcional y tasa con procedencia reunidos en Exportar, donde se prepara la descarga del Excel.
+- El método de carga y los borradores manuales se conservan al cambiar idioma o tema; una entrada inválida mantiene los datos para corregirlos.
+- Una edición de los gastos, la tasa o los datos del reporte invalida la descarga anterior para evitar exportar un archivo desactualizado.
 - Textos de revisión y acciones más breves; vaciar los gastos requiere una confirmación explícita en la sesión.
 
 ### Corregido

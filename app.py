@@ -231,6 +231,12 @@ def refresh_bcv_rate() -> None:
         st.session_state.bcv_last_error = True
 
 
+def remember_input_method(widget_key: str) -> None:
+    method = st.session_state.get(widget_key)
+    if method in ("receipts", "manual"):
+        st.session_state.input_method = method
+
+
 def df_gastos() -> pd.DataFrame:
     df = st.session_state.gastos
     if df.empty:
@@ -251,6 +257,9 @@ def expense_count_caption(language: str, count: int) -> str:
 
 
 # ---------------- Compact preferences ----------------
+if st.session_state.get("input_method") not in ("receipts", "manual"):
+    old_method = st.session_state.get("upload_method")
+    st.session_state.input_method = old_method if old_method in ("receipts", "manual") else "receipts"
 if "manual_expense_date" not in st.session_state:
     st.session_state.manual_expense_date = date.today().strftime("%d/%m/%Y")
 if st.session_state.pop("manual_reset_pending", False):
@@ -386,11 +395,19 @@ except ValueError:
 
 # ---------------- Add expenses ----------------
 with tab1:
-    method = st.radio(
+    method_key = f"upload_method_{language}"
+    method_labels = {
+        "receipts": tr(language, "upload_method_receipts"),
+        "manual": tr(language, "upload_method_manual"),
+    }
+    selected_method = st.radio(
         tr(language, "upload_method"), ["receipts", "manual"], horizontal=True,
-        format_func=lambda method: tr(language, "upload_method_receipts" if method == "receipts" else "upload_method_manual"),
-        label_visibility="collapsed", key="upload_method",
+        index=0 if st.session_state.input_method == "receipts" else 1,
+        format_func=lambda method: method_labels.get(method, str(method)),
+        label_visibility="collapsed", key=method_key,
+        on_change=remember_input_method, args=(method_key,),
     )
+    method = selected_method if selected_method in method_labels else st.session_state.input_method
     if method == "receipts":
         with st.container(key="receipt_panel"):
             st.subheader(tr(language, "upload_title"))
