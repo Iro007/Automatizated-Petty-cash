@@ -6,6 +6,7 @@ Todas las notas importantes sobre los cambios en este proyecto se documentarán 
 ### Corregido
 - Priorizar los importes que coinciden con etiquetas específicas como `TOTAL` o `MONTO`; las comisiones encontradas por la búsqueda genérica de importes en Bs ya no desplazan el total.
 - Declarar el modelo de idioma español de Tesseract en las dependencias del despliegue, acorde con la solicitud OCR `spa+eng`.
+- Aceptar coma o punto decimal en la tabla de revisión y en el formulario de gasto manual, y bloquear la exportación mientras haya importes inválidos.
 
 ### Pendiente
 - Agregar mejoras en los patrones de busqueda

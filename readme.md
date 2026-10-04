@@ -10,7 +10,7 @@ Aplicación Python/Streamlit para preparar una relación de gastos de caja chica
 4. Consulta el resumen y genera el Excel. El archivo incluye conversiones, totales, saldo y espacios para firmas.
 5. Revisa el archivo antes de utilizarlo. Cambiar la tasa en **F8** modifica las fórmulas de conversión a USD.
 
-La tasa la introduce el usuario; la aplicación no consulta una cotización automática. La planilla se construye con `openpyxl`, sin depender de `base/caja_chica_base.xlsx`. Los campos de texto introducidos por el usuario se guardan como texto literal en las celdas, preservando las fórmulas propias de cálculo.
+La tasa la introduce el usuario; la aplicación no consulta una cotización automática. La planilla se construye con `openpyxl`, sin depender de `base/caja_chica_base.xlsx`. Los campos de texto introducidos por el usuario se guardan como texto literal en las celdas, preservando las fórmulas propias de cálculo. En la tabla y el formulario manual, los importes aceptan coma o punto decimal (por ejemplo, `749,50` y `749.50`); comprueba el valor antes de exportar.
 
 ## Demo con datos ficticios
 
@@ -78,7 +78,7 @@ Con las dependencias Python instaladas:
 .\.venv\Scripts\python.exe tests\test_regressions.py
 ```
 
-Las pruebas guardan resultados y ejemplos sintéticos en `evidence/demo_20261003/`, carpeta ignorada por Git. Incluyen validación de fechas, generación de Excel, referencias de fórmula y conservación de texto literal después de guardar y reabrir el archivo. Las pruebas de estructuras de 0, 1, 30 y 1.000 filas no establecen una capacidad máxima ni evalúan rendimiento.
+Las pruebas guardan resultados y ejemplos sintéticos en `evidence/demo_20261003/`, carpeta ignorada por Git. Incluyen prioridad del total etiquetado frente a una comisión, entrada de importes con coma o punto, validación de fechas, generación de Excel, referencias de fórmula y conservación de texto literal después de guardar y reabrir el archivo. Las pruebas de estructuras de 0, 1, 30 y 1.000 filas no establecen una capacidad máxima ni evalúan rendimiento.
 
 Además se recorrió la demo en Chromium con imágenes sintéticas y se comprobó el recálculo de fórmulas en un motor independiente. Microsoft Excel Desktop no se ejecutó en esta verificación. La vista del Excel mostrada arriba es renderizada; el archivo generado solicita recálculo al abrirlo y no contiene resultados calculados en caché por `openpyxl`.
 

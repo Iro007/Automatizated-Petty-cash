@@ -11,7 +11,9 @@ import pandas as pd
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+from amount_utils import parse_monto_usuario
 from excel_builder import build_caja_chica, validar_fecha_gasto
+from ocr_utils import extraer_campos
 OUT=ROOT / 'evidence/demo_20261003'
 OUT.mkdir(parents=True, exist_ok=True)
 checks=[]
@@ -22,6 +24,24 @@ def rejects(call):
     except ValueError as exc: return str(exc)
     return None
 row={"proveedor":"Proveedor de ejemplo","fecha":"03/10/2026","factura":"000001","monto_bs":100.0,"descripcion":"Datos ficticios"}
+ocr_text = "CONCEPTO Transporte de ejemplo\nTOTAL Bs 749,50\nCOMISION INCLUIDA Bs 25,00"
+ocr_fields = extraer_campos(ocr_text)
+check("prefer_labeled_total_over_generic_commission", ocr_fields["monto_bs"] == 749.50, ocr_fields)
+for amount_text, expected in [
+    ("749,50", 749.50), ("749.50", 749.50),
+    ("1.250,50", 1250.50), ("1,250.50", 1250.50),
+    ("1.250", 1250.0), ("1,250", 1250.0),
+    ("749.50 Bs", 749.50), ("", 0.0),
+]:
+    actual = parse_monto_usuario(amount_text)
+    check(f"amount_separator_{amount_text or 'blank'}", actual == expected, {"input":amount_text,"actual":actual,"expected":expected})
+for invalid_amount in ["abc", "1,23,45", "1.234,567", "-749,50"]:
+    try:
+        parse_monto_usuario(invalid_amount)
+        rejected = False
+    except ValueError:
+        rejected = True
+    check(f"amount_invalid_{invalid_amount}", rejected, {"input":invalid_amount,"rejected":rejected})
 for value in ["31/02/2026","31/04/2026","29/02/2025","00/10/2026","03/13/2026","03/10/0000","","   ",None,"2026-10-03","3/10/2026",pd.NaT]:
     message=rejects(lambda:validar_fecha_gasto(value))
     check(f"date_reject_{value!s}",message is not None and "Fecha inválida" in message,{"input":str(value),"error":message})
@@ -53,7 +73,7 @@ for text in ['=1+1','=HYPERLINK("https://example.invalid","demo")','+1+1','-1+1'
     if text=='=1+1':
         (OUT/'texto_literal_ejemplo.xlsx').write_bytes(raw)
         (OUT/'literal_export_check.json').write_text(json.dumps({"user_cells":{c:{"value":s[c].value,"type":s[c].data_type,"xml_type":cells[c].attrib.get("t"),"has_formula":cells[c].find("s:f",ns) is not None} for c in targets},"legitimate_formulas":{c:{"value":s[c].value,"type":s[c].data_type} for c in expected}},ensure_ascii=False,indent=2),encoding='utf-8')
-result={"all_checks_passed":all(c["passed"] for c in checks),"checks":checks,"scope":"Date validity and literal string storage in XLSX. Not a general security assessment.","native_excel":"not_verified"}
+result={"all_checks_passed":all(c["passed"] for c in checks),"checks":checks,"scope":"Receipt amount priority, comma/dot amount input, date validity and literal string storage in XLSX. Not a general security assessment.","native_excel":"not_verified"}
 (OUT/'regression_results.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({"checks":len(checks),"passed":sum(c['passed'] for c in checks),"failed":[c for c in checks if not c['passed']]},ensure_ascii=False,indent=2))
 if not result['all_checks_passed']:raise SystemExit(1)

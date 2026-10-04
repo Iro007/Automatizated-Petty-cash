@@ -26,9 +26,20 @@ record("empty_manual_entry_rejected", any("obligatorios" in x.value for x in at.
 for x in at.text_input:
     if x.label == "Proveedor / Comercio*": x.set_value("Proveedor ficticio")
     if x.label == "Fecha (dd/mm/aaaa)": x.set_value("31/02/2026")
-next(x for x in at.number_input if x.label == "Monto (Bs)*").set_value(10.0)
+next(x for x in at.text_input if x.label == "Monto (Bs)*").set_value("10,00")
 next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
 record("invalid_manual_date_rejected", len(at.session_state["gastos"]) == 0 and any("Fecha inválida" in x.value for x in at.error), [x.value for x in at.error])
+for x in at.text_input:
+    if x.label == "Proveedor / Comercio*": x.set_value("Proveedor de prueba")
+    if x.label == "Fecha (dd/mm/aaaa)": x.set_value("03/10/2026")
+    if x.label == "Monto (Bs)*": x.set_value("10.00")
+next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
+record("manual_period_decimal_accepted", len(at.session_state["gastos"]) == 1 and math.isclose(float(at.session_state["gastos"].iloc[0]["monto_bs"]), 10.0), at.session_state["gastos"].to_dict(orient="records"))
+for x in at.text_input:
+    if x.label == "Proveedor / Comercio*": x.set_value("Segundo gasto")
+    if x.label == "Monto (Bs)*": x.set_value("10,00")
+next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
+record("manual_comma_decimal_accepted", len(at.session_state["gastos"]) == 2 and math.isclose(float(at.session_state["gastos"].iloc[1]["monto_bs"]), 10.0), at.session_state["gastos"].to_dict(orient="records"))
 rows = [
     {"proveedor":"Papelería de ejemplo", "fecha":"03/10/2026", "factura":"100001", "monto_bs":1250.50, "descripcion":"Materiales ficticios"},
     {"proveedor":"Transporte de ejemplo", "fecha":"03/10/2026", "factura":"100002", "monto_bs":749.50, "descripcion":"Monto revisado contra comprobante sintético"},

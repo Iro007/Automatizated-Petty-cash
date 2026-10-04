@@ -13,6 +13,7 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
+from amount_utils import parse_monto_usuario
 from excel_builder import build_caja_chica, validar_fecha_gasto
 from ocr_utils import extraer_campos, ocr_imagen
 
@@ -69,6 +70,8 @@ if "last_file" not in st.session_state:
     st.session_state.last_file = None
 if "editor_version" not in st.session_state:
     st.session_state.editor_version = 0
+if "monto_editor_invalid_rows" not in st.session_state:
+    st.session_state.monto_editor_invalid_rows = []
 
 
 def df_gastos() -> pd.DataFrame:
@@ -106,6 +109,7 @@ with st.sidebar:
     if st.button("🗑️ Vaciar tabla de gastos"):
         st.session_state.gastos = pd.DataFrame(columns=COLS)
         st.session_state.editor_version += 1
+        st.session_state.monto_editor_invalid_rows = []
         st.rerun()
 
 # ---------------- Hero ----------------
@@ -131,13 +135,16 @@ with tab1:
             accept_multiple_files=True,
             help="También puedes agregar gastos manualmente abajo si el OCR falla.",
         )
+        monto_invalido = bool(st.session_state.get("monto_editor_invalid_rows"))
+        if monto_invalido:
+            st.info("Corrige los importes inválidos en la pestaña **Revisar y editar** antes de procesar más comprobantes.")
         if files:
             st.write(f"**{len(files)}** archivo(s) listos para procesar:")
             cols = st.columns(3)
             for i, f in enumerate(files):
                 with cols[i % 3]:
                     st.image(f, caption=f.name, use_container_width=True)
-        procesar = st.button("🔍 Procesar con OCR y agregar", disabled=not files)
+        procesar = st.button("🔍 Procesar con OCR y agregar", disabled=not files or monto_invalido)
         st.markdown("</div>", unsafe_allow_html=True)
 
         if procesar and files:
@@ -170,18 +177,24 @@ with tab1:
             m_prov = st.text_input("Proveedor / Comercio*")
             m_fec = st.text_input("Fecha (dd/mm/aaaa)", value=date.today().strftime("%d/%m/%Y"))
             m_fac = st.text_input("N° Factura / Referencia")
-            m_monto = st.number_input("Monto (Bs)*", min_value=0.0, format="%.2f")
+            m_monto = st.text_input("Monto (Bs)*", placeholder="749,50 o 749.50", help="Acepta coma o punto decimal; también formatos como 1.250,50 o 1,250.50.")
             m_desc = st.text_input("Descripción (opcional)")
-            if st.form_submit_button("Agregar a la tabla"):
+            monto_invalido = bool(st.session_state.get("monto_editor_invalid_rows"))
+            if monto_invalido:
+                st.warning("Corrige los importes inválidos de la tabla antes de agregar otro gasto.")
+            if st.form_submit_button("Agregar a la tabla", disabled=monto_invalido):
                 if not m_prov or not m_monto:
                     st.error("Proveedor y monto son obligatorios.")
                 else:
                     try:
                         fecha_manual = validar_fecha_gasto(m_fec)
+                        monto_manual = parse_monto_usuario(m_monto)
+                        if monto_manual <= 0:
+                            raise ValueError("El monto debe ser mayor que cero.")
                     except ValueError as exc:
                         st.error(str(exc))
                     else:
-                        row = pd.DataFrame([{"proveedor": m_prov.strip().capitalize(), "fecha": fecha_manual, "factura": m_fac.strip(), "monto_bs": float(m_monto), "descripcion": m_desc.strip()}])
+                        row = pd.DataFrame([{"proveedor": m_prov.strip().capitalize(), "fecha": fecha_manual, "factura": m_fac.strip(), "monto_bs": monto_manual, "descripcion": m_desc.strip()}])
                         st.session_state.gastos = pd.concat([df_gastos(), row], ignore_index=True)
                         st.session_state.editor_version += 1
                         st.success("Gasto agregado.")
@@ -191,30 +204,51 @@ with tab1:
 with tab2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Edita antes de generar")
-    st.caption("Puedes corregir proveedor, fecha, referencia, monto y descripción. Marca filas y elimínalas si hace falta.")
+    st.caption("Puedes corregir proveedor, fecha, referencia, monto y descripción. Para decimales puedes usar coma o punto: 749,50 o 749.50. También acepta separadores de miles: 1.250,50 o 1,250.50.")
     df = df_gastos()
     if df.empty:
+        st.session_state.monto_editor_invalid_rows = []
         st.info("Aún no hay gastos. Carga imágenes en la pestaña 1 o agrega uno manual.")
     else:
         editor_key = f"editor_{st.session_state.editor_version}"
         if st.session_state.get("editor_base_version") != st.session_state.editor_version:
             st.session_state.editor_base = df.copy()
             st.session_state.editor_base_version = st.session_state.editor_version
-        edited = st.data_editor(
-            st.session_state.editor_base,
+        editor_data = st.session_state.editor_base.copy()
+        editor_data["monto_bs"] = editor_data["monto_bs"].map(
+            lambda value: "" if pd.isna(value) else f"{float(value):.2f}"
+        )
+        edited_input = st.data_editor(
+            editor_data,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
                 "proveedor": st.column_config.TextColumn(PRETTY["proveedor"], required=True),
                 "fecha": st.column_config.TextColumn(PRETTY["fecha"], help="dd/mm/aaaa"),
                 "factura": st.column_config.TextColumn(PRETTY["factura"]),
-                "monto_bs": st.column_config.NumberColumn(PRETTY["monto_bs"], format="%.2f", min_value=0),
+                "monto_bs": st.column_config.TextColumn(
+                    PRETTY["monto_bs"],
+                    help="Acepta coma o punto decimal, por ejemplo 749,50 o 749.50.",
+                ),
                 "descripcion": st.column_config.TextColumn(PRETTY["descripcion"]),
             },
             key=editor_key,
         )
+        edited = edited_input.copy()
+        importes, filas_invalidas = [], []
+        for fila, raw_amount in enumerate(edited_input["monto_bs"].tolist(), start=1):
+            try:
+                importes.append(parse_monto_usuario(raw_amount))
+            except ValueError:
+                importes.append(0.0)
+                filas_invalidas.append(fila)
+        edited["monto_bs"] = importes
+        st.session_state.monto_editor_invalid_rows = filas_invalidas
         # Keep the widget baseline fixed while edits accumulate or are reverted.
         st.session_state.gastos = edited.reset_index(drop=True)
+        if filas_invalidas:
+            filas = ", ".join(str(fila) for fila in filas_invalidas)
+            st.error(f"Monto inválido en la(s) fila(s) {filas}. Usa coma o punto decimal y corrige el valor antes de generar.")
         total_bs, total_usd = totales(edited, tasa or 0)
         m1, m2, m3 = st.columns(3)
         m1.metric("N° gastos", len(edited))
@@ -266,6 +300,8 @@ with tab4:
     if df.empty:
         errores.append("La tabla de gastos está vacía.")
     else:
+        if st.session_state.get("monto_editor_invalid_rows"):
+            errores.append("Hay montos inválidos en la tabla. Corrígelos en **Revisar y editar** antes de generar el archivo.")
         for idx, valor in enumerate(df["fecha"], start=1):
             try:
                 validar_fecha_gasto(valor)
