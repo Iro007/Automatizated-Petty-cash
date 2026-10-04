@@ -1,16 +1,16 @@
 # Automatizated Petty Cash
 
-Aplicación Python/Streamlit para preparar una relación de gastos de caja chica. La interfaz está disponible en español e inglés, detecta el idioma del navegador (con selector manual) y ofrece modo claro u oscuro. Carga imágenes, extrae campos mediante OCR, permite revisarlos y corregirlos o ingresar gastos manualmente y genera una planilla Excel propia por código.
+Aplicación Python/Streamlit para preparar una relación de gastos de caja chica. La interfaz está disponible en español e inglés, detecta el idioma del navegador y ofrece modo claro u oscuro. Los controles de idioma y apariencia están en la cabecera; las cuatro pestañas muestran cada paso del trabajo. Carga imágenes, revisa los campos extraídos mediante OCR o ingresa gastos manualmente y genera una planilla Excel propia por código.
 
 ## Flujo
 
-1. Introduce responsable, cédula, monto otorgado y fecha de emisión. Al iniciar, la app consulta la tasa USD oficial del BCV y su `Fecha Valor`; también puedes actualizarla o escribir una tasa manual.
-2. Carga comprobantes PNG, JPG, JPEG o WEBP y procesa con OCR, o agrega gastos manualmente.
-3. Revisa proveedor, fecha, referencia, importe y descripción. Las fechas deben existir y usar `dd/mm/aaaa`.
-4. Consulta el resumen y genera el Excel. El archivo incluye conversiones, totales, saldo y espacios para firmas.
+1. En **Cargar**, elige comprobantes PNG, JPG, JPEG o WEBP para procesar con OCR, o selecciona gasto manual. Cada método muestra sus propios controles; referencia y descripción son opcionales.
+2. En **Revisar**, corrige proveedor, fecha, referencia, importe y descripción. Las fechas deben existir y usar `dd/mm/aaaa`.
+3. Consulta los totales y el gráfico por proveedor en **Resumen**.
+4. En **Exportar**, completa responsable, cédula, monto otorgado y fecha de emisión. En esa pestaña también están la tasa y su procedencia, y los datos opcionales de empresa. El archivo incluye conversiones, totales, saldo y espacios para firmas.
 5. Revisa el archivo antes de utilizarlo. Cambiar la tasa numérica en **F8** modifica las fórmulas de conversión a USD.
 
-La consulta lee el valor USD y la fecha `Fecha Valor` de la [página oficial del BCV](https://www.bcv.org.ve/estadisticas/tipo-cambio-de-referencia-smc), se cachea durante 15 minutos y se puede actualizar con el botón de la barra lateral. La fecha mostrada es la publicada por el BCV, incluso cuando cae en el siguiente día hábil. Si la consulta falla, la app avisa y permite ingresar una tasa manual; una tasa anterior no se presenta como cotización vigente. Si se modifica la tasa BCV, la app y el Excel la identifican como ajuste manual y conservan la referencia BCV y su fecha.
+La consulta lee el valor USD y la fecha `Fecha Valor` de la [página oficial del BCV](https://www.bcv.org.ve/estadisticas/tipo-cambio-de-referencia-smc), se cachea durante 15 minutos y se puede actualizar desde **Exportar**, en **Tasa y procedencia**. La fecha mostrada es la publicada por el BCV, incluso cuando cae en el siguiente día hábil. Si la consulta falla, la app avisa y permite ingresar una tasa manual; una tasa anterior no se presenta como cotización vigente. Si se modifica la tasa BCV, la app y el Excel la identifican como ajuste manual y conservan la referencia BCV y su fecha.
 
 La planilla se construye con `openpyxl`, sin depender de una plantilla externa. F8 se mantiene numérica y editable; la fila 9 registra la procedencia, la tasa y su `Fecha Valor` cuando existen. Los metadatos describen la exportación: si cambias F8 directamente en Excel, actualiza también la fila 9. Los campos de texto introducidos por el usuario se guardan como texto literal en las celdas, preservando las fórmulas propias de cálculo. En español se usa `1.250,50` y en inglés `1,250.50`; la fecha se conserva como `DD/MM/YYYY` en ambos idiomas. Comprueba siempre los importes antes de exportar.
 

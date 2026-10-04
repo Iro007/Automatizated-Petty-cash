@@ -8,6 +8,12 @@ Todas las notas importantes sobre los cambios en este proyecto se documentarán 
 - Consulta cacheada por 15 minutos de la tasa USD del BCV y su `Fecha Valor`, con actualización explícita, ajuste manual y aviso si no hay conexión.
 - Etiquetas bilingües y procedencia de la tasa en el Excel; F8 sigue siendo numérica y conserva las fórmulas de conversión.
 
+### Cambiado
+- Cabecera compacta con idioma y modo oscuro; navegación de cuatro pasos con etiquetas breves.
+- Selección entre comprobantes y gasto manual para mostrar un formulario a la vez; referencia y descripción se agrupan como detalles opcionales.
+- Datos del reporte, empresa opcional y tasa con procedencia reunidos en Exportar, donde se prepara la descarga del Excel.
+- Textos de revisión y acciones más breves; vaciar los gastos requiere una confirmación explícita en la sesión.
+
 ### Corregido
 - Priorizar los importes que coinciden con etiquetas específicas como `TOTAL` o `MONTO`; las comisiones encontradas por la búsqueda genérica de importes en Bs ya no desplazan el total.
 - Declarar el modelo de idioma español de Tesseract en las dependencias del despliegue, acorde con la solicitud OCR `spa+eng`.

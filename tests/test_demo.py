@@ -16,6 +16,7 @@ from streamlit.testing.v1 import AppTest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from excel_builder import build_caja_chica
+from i18n import tr
 
 OUT = ROOT / "evidence/demo_20261003"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -56,6 +57,11 @@ def text_input(at, label):
     return next(item for item in at.text_input if item.label == label)
 
 
+def action(at, key):
+    label = tr(at.session_state["language"], key)
+    return next(item for item in at.button if item.label == label)
+
+
 st.cache_data.clear()
 bcv_mock = patch("bcv_rate.urlopen", side_effect=lambda *_args, **_kwargs: FakeResponse())
 urlopen_mock = bcv_mock.start()
@@ -71,16 +77,28 @@ record(
     and at.session_state["bcv_value_date"] == "2026-10-05",
     {"rate": at.session_state["bcv_reference_rate"], "value_date": at.session_state["bcv_value_date"]},
 )
-record("required_generation_inputs", len(at.error) == 4, [x.value for x in at.error])
+record("initial_screen_has_no_premature_validation_errors", len(at.error) == 0, [x.value for x in at.error])
+record(
+    "empty_expenses_disable_generation",
+    action(at, "generate_excel").disabled and at.session_state["last_file"] is None,
+    {"disabled": action(at, "generate_excel").disabled},
+)
+record(
+    "receipt_method_is_default_and_hides_manual_fields",
+    at.radio(key="upload_method").value == "receipts"
+    and not any(item.key == "manual_supplier" for item in at.text_input),
+    {"method": at.radio(key="upload_method").value, "text_input_keys": [item.key for item in at.text_input]},
+)
 issue_date_field = text_input(at, "Fecha de emisión (dd/mm/aaaa)")
 record("issue_date_defaults_to_venezuelan_format", re.fullmatch(r"\d{2}/\d{2}/\d{4}", issue_date_field.value) is not None, issue_date_field.value)
 
 at.run()
 record("bcv_fetch_is_cached_during_session", urlopen_mock.call_count == 1, urlopen_mock.call_count)
-next(x for x in at.button if x.label == "Actualizar tasa BCV").click().run()
+action(at, "rate_refresh").click().run()
 record("explicit_bcv_refresh_bypasses_cache", urlopen_mock.call_count == 2, urlopen_mock.call_count)
 
-next(x for x in at.radio if x.label == "Idioma").set_value("en").run()
+at.radio(key="upload_method").set_value("manual").run()
+at.radio(key="language").set_value("en").run()
 record(
     "manual_language_switch_translates_ui",
     any(x.label == "Vendor / Merchant*" for x in at.text_input)
@@ -95,31 +113,58 @@ record(
     {"dark_mode": at.session_state["dark_mode"], "dark_css_present": "--app-bg:#0F172A" in css},
 )
 next(x for x in at.toggle if x.label == "Dark mode").set_value(False).run()
-next(x for x in at.radio if x.label == "Language").set_value("es").run()
+at.radio(key="language").set_value("es").run()
 
-next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
+action(at, "manual_add_button").click().run()
 record("empty_manual_entry_rejected", any("obligatorios" in x.value for x in at.error), [x.value for x in at.error])
 text_input(at, "Proveedor / Comercio*").set_value("Proveedor ficticio")
 text_input(at, "Fecha (dd/mm/aaaa)").set_value("31/02/2026")
 text_input(at, "Monto (Bs)*").set_value("10,00")
-next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
+action(at, "manual_add_button").click().run()
 record(
     "invalid_manual_date_rejected",
     len(at.session_state["gastos"]) == 0 and any("Fecha inválida" in x.value for x in at.error),
     [x.value for x in at.error],
 )
+record(
+    "invalid_manual_submission_keeps_entered_values",
+    at.text_input(key="manual_supplier").value == "Proveedor ficticio"
+    and at.text_input(key="manual_expense_date").value == "31/02/2026"
+    and at.text_input(key="manual_amount").value == "10,00",
+    {item.key: item.value for item in at.text_input if item.key.startswith("manual_")},
+)
+at.radio(key="upload_method").set_value("receipts").run()
+record(
+    "receipts_method_hides_manual_draft",
+    not any(item.key == "manual_supplier" for item in at.text_input),
+    [item.key for item in at.text_input],
+)
+at.radio(key="upload_method").set_value("manual").run()
+record(
+    "manual_draft_survives_method_switch",
+    at.text_input(key="manual_supplier").value == "Proveedor ficticio"
+    and at.text_input(key="manual_expense_date").value == "31/02/2026"
+    and at.text_input(key="manual_amount").value == "10,00",
+    {item.key: item.value for item in at.text_input if item.key.startswith("manual_")},
+)
 text_input(at, "Fecha (dd/mm/aaaa)").set_value("03/10/2026")
 text_input(at, "Monto (Bs)*").set_value("10.00")
-next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
+action(at, "manual_add_button").click().run()
 record(
     "manual_period_decimal_accepted",
     len(at.session_state["gastos"]) == 1
     and math.isclose(float(at.session_state["gastos"].iloc[0]["monto_bs"]), 10.0),
     at.session_state["gastos"].to_dict(orient="records"),
 )
+record(
+    "successful_manual_submission_clears_draft",
+    at.text_input(key="manual_supplier").value == ""
+    and at.text_input(key="manual_amount").value == "",
+    {"supplier": at.text_input(key="manual_supplier").value, "amount": at.text_input(key="manual_amount").value},
+)
 text_input(at, "Proveedor / Comercio*").set_value("Segundo gasto")
 text_input(at, "Monto (Bs)*").set_value("10,00")
-next(x for x in at.button if x.label == "Agregar a la tabla").click().run()
+action(at, "manual_add_button").click().run()
 record(
     "manual_comma_decimal_accepted",
     len(at.session_state["gastos"]) == 2
@@ -133,6 +178,7 @@ rows = [
     {"proveedor": "Servicio de ejemplo", "fecha": "03/10/2026", "factura": "100003", "monto_bs": 500.0, "descripcion": "Gasto ficticio agregado manualmente"},
 ]
 at.session_state["gastos"] = pd.DataFrame(rows)
+at.session_state["editor_version"] += 1
 for item in at.text_input:
     values = {
         "Nombre": "DEMOSTRACIÓN FICTICIA",
@@ -150,21 +196,23 @@ for item in at.text_input:
         item.set_value(values[item.label])
 at.run()
 text_input(at, "Fecha de emisión (dd/mm/aaaa)").set_value("31/02/2026").run()
+action(at, "generate_excel").click().run()
 record(
     "invalid_issue_date_blocks_generation",
-    any("Fecha de emisión inválida" in item.value for item in at.error)
-    and not any(item.label == "📄 Generar archivo Excel" for item in at.button),
-    [item.value for item in at.error],
+    any("Fecha de emisión inválida" in item.value for item in at.warning)
+    and at.session_state["last_file"] is None,
+    [item.value for item in at.warning],
 )
 text_input(at, "Fecha de emisión (dd/mm/aaaa)").set_value("03/10/2026").run()
 at.session_state["gastos"] = pd.DataFrame([{**rows[0], "fecha": "31/02/2026"}])
 at.session_state["editor_version"] += 1
 at.run()
+action(at, "generate_excel").click().run()
 record(
     "invalid_edited_date_blocks_generation",
-    any("Gasto 1: Fecha inválida" in x.value for x in at.error)
-    and not any(x.label == "📄 Generar archivo Excel" for x in at.button),
-    [x.value for x in at.error],
+    any("Gasto 1: Fecha inválida" in x.value for x in at.warning)
+    and at.session_state["last_file"] is None,
+    [x.value for x in at.warning],
 )
 at.session_state["gastos"] = pd.DataFrame(rows)
 at.session_state["editor_version"] += 1
@@ -172,10 +220,10 @@ at.run()
 record(
     "corrected_date_reenables_generation",
     not any("Fecha inválida" in x.value for x in at.error)
-    and any(x.label == "📄 Generar archivo Excel" for x in at.button),
+    and not action(at, "generate_excel").disabled,
     [x.value for x in at.error],
 )
-next(x for x in at.button if x.label == "📄 Generar archivo Excel").click().run()
+action(at, "generate_excel").click().run()
 record("app_generates_workbook", len(at.exception) == 0 and at.session_state["last_file"] is not None, [str(x.value) for x in at.exception])
 _name, data, source_path = at.session_state["last_file"]
 example = OUT / "caja_chica_ejemplo.xlsx"
@@ -212,6 +260,22 @@ record(
 record("rate_remains_numeric_with_eight_decimals", isinstance(ws["F8"].value, (float, int)) and "0.00000000" in ws["F8"].number_format, ws["F8"].number_format)
 record("independent_totals", math.isclose(sum(r["monto_bs"] for r in rows), 2500) and math.isclose(sum(r["monto_bs"] for r in rows) / 50, 50), {"bs": 2500, "usd": 50, "balance": 50})
 
+text_input(at, "Tasa aplicada (Bs/USD)").set_value("55,00000000").run()
+record(
+    "editing_rate_invalidates_existing_download",
+    at.session_state["last_file"] is None,
+    {"rate": at.session_state["rate_input"], "last_file_cleared": at.session_state["last_file"] is None},
+)
+text_input(at, "Tasa aplicada (Bs/USD)").set_value("50,00000000").run()
+action(at, "generate_excel").click().run()
+text_input(at, "N° Reporte").set_value("DEMO-PRUEBAS-EDITADO").run()
+record(
+    "editing_report_invalidates_existing_download",
+    at.session_state["last_file"] is None,
+    {"report": at.session_state["n_reporte"], "last_file_cleared": at.session_state["last_file"] is None},
+)
+text_input(at, "N° Reporte").set_value("DEMO-PRUEBAS-20261003").run()
+
 at.session_state["language"] = "en"
 at.session_state["language_last"] = "es"
 at.session_state["editor_version"] += 1
@@ -221,7 +285,7 @@ for item in at.text_input:
     if item.label == "Applied rate (Bs/USD)": item.set_value("50.00000000")
 at.run()
 record("english_amount_rate_and_date_inputs_render", any(item.label == "Amount granted (USD)" for item in at.text_input) and any(item.label == "Applied rate (Bs/USD)" for item in at.text_input) and any(item.label == "Issue date (DD/MM/YYYY)" for item in at.text_input), [item.label for item in at.text_input])
-next(x for x in at.button if x.label == "📄 Generate Excel file").click().run()
+action(at, "generate_excel").click().run()
 _, english_data, _ = at.session_state["last_file"]
 english_example = OUT / "petty_cash_example.xlsx"
 english_example.write_bytes(english_data)
@@ -266,7 +330,7 @@ stale_at.session_state["language"] = "es"
 stale_at.session_state["language_last"] = "es"
 stale_at.run()
 urlopen_mock.side_effect = TimeoutError("synthetic refresh failure")
-next(x for x in stale_at.button if x.label == "Actualizar tasa BCV").click().run()
+action(stale_at, "rate_refresh").click().run()
 record(
     "failed_refresh_marks_retained_bcv_value_stale",
     stale_at.session_state["bcv_last_error"]
@@ -286,7 +350,13 @@ for count in [0, 1, 30, 1000]:
 for item in at.text_input:
     if item.label == "Applied rate (Bs/USD)": item.set_value("0")
 at.run()
-record("zero_rate_blocks_generation", not any(item.label == "📄 Generate Excel file" for item in at.button), [item.value for item in at.error])
+action(at, "generate_excel").click().run()
+record(
+    "zero_rate_blocks_generation",
+    any("Bs/USD rate" in item.value for item in at.warning)
+    and at.session_state["last_file"] is None,
+    [item.value for item in at.warning],
+)
 
 result = {
     "checks": checks,
