@@ -3,7 +3,10 @@
 Todas las notas importantes sobre los cambios en este proyecto se documentarán en este archivo.
 
 ## [Unreleased]
-Cambios futuros
+### Corregido
+- Priorizar los importes que coinciden con etiquetas específicas como `TOTAL` o `MONTO`; las comisiones encontradas por la búsqueda genérica de importes en Bs ya no desplazan el total.
+
+### Pendiente
 - Agregar mejoras en los patrones de busqueda
 - Scrapear tasa del dolar 
 - Agregar bot que manda a tu whatsapp el archivo

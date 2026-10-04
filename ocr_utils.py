@@ -71,11 +71,14 @@ def extraer_campos(texto: str) -> dict:
     prov = " ".join(prov.split())[:60].capitalize()
     fecha = _clean_fecha(_first_match(texto, PATTERNS_FECHA))
     ref = _first_match(texto, PATTERNS_REF) or ""
-    # Para montos con varios matches, preferir el último (suele ser el total)
-    montos = []
+    # Aplicar los patrones por especificidad. No mezclar etiquetas explícitas
+    # (TOTAL, MONTO) con importes genéricos en Bs, que pueden ser comisiones.
+    monto = 0.0
     for p in PATTERNS_MONTO:
-        montos += re.findall(p, texto, re.IGNORECASE)
-    monto = _clean_monto(montos[-1] if montos else None)
+        montos = re.findall(p, texto, re.IGNORECASE)
+        if montos:
+            monto = _clean_monto(montos[-1])
+            break
     return {"proveedor": prov, "fecha": fecha or datetime.now().strftime("%d/%m/%Y"), "factura": ref.strip(), "monto_bs": monto, "descripcion": ""}
 
 
