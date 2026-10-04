@@ -53,7 +53,7 @@ Estas son instrucciones de preparación; esta revisión reutilizó las dependenc
 
 `pytesseract` es un adaptador Python: también necesita el ejecutable de **Tesseract** y sus modelos de idioma. Consulta la [documentación de instalación de Tesseract](https://tesseract-ocr.github.io/tessdoc/Installation.html) y, para Windows, los [instaladores de UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki).
 
-La función OCR solicita `spa+eng`. Para utilizar ambos idiomas, Tesseract debe disponer de los modelos `spa` y `eng`. La prueba local usó Tesseract 5.4.0 con `eng` disponible; no se verificó el modelo español.
+La función OCR solicita `spa+eng`. Para utilizar ambos idiomas, Tesseract debe disponer de los modelos `spa` y `eng`. `packages.txt` declara el motor y el paquete de idioma español para Streamlit Community Cloud. En Windows local, confirma que ambos modelos estén instalados con `tesseract --list-langs`. La prueba local anterior usó Tesseract 5.4.0 con `eng`; no verificó el modelo español.
 
 Si el ejecutable no está en PATH, añade su carpeta **solo a la sesión de PowerShell que ejecuta la app**. Este ejemplo corresponde a la instalación local utilizada; adapta la carpeta si instalaste Tesseract en otro lugar.
 
