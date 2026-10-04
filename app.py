@@ -18,7 +18,8 @@ from amount_utils import parse_monto_usuario, parse_tasa_usuario
 from bcv_rate import BCV_URL, fetch_bcv_rate
 from excel_builder import build_caja_chica, validar_fecha_gasto
 from i18n import format_number, normalize_language, tr
-from ocr_utils import extraer_campos, ocr_imagen
+from ocr_utils import ocr_imagen
+from ui import app_css, brand_header, section_header, workspace_intro, workspace_summary, workflow_guide
 
 
 def _detect_browser_language() -> str:
@@ -66,108 +67,6 @@ def _cached_bcv_rate() -> dict[str, str]:
         "source_url": result.source_url,
     }
 
-
-def app_css(dark_mode: bool) -> str:
-    grid_filter = "invert(0.90) hue-rotate(180deg) brightness(1.08)" if dark_mode else "none"
-    if dark_mode:
-        colors = {
-            "bg": "#0F172A", "surface": "#1E293B", "sidebar": "#111827",
-            "text": "#F1F5F9", "muted": "#CBD5E1", "border": "#475569",
-            "input": "#273449", "primary": "#60A5FA", "accent": "#22C55E",
-            "scheme": "dark",
-        }
-    else:
-        colors = {
-            "bg": "#F8FAFC", "surface": "#FFFFFF", "sidebar": "#F8FAFC",
-            "text": "#172B4D", "muted": "#53657D", "border": "#E5E7EB",
-            "input": "#F8FAFC", "primary": "#2563EB", "accent": "#16A34A",
-            "scheme": "light",
-        }
-    return f"""
-    <style>
-    :root {{
-      --app-bg:{colors['bg']}; --app-surface:{colors['surface']}; --app-sidebar:{colors['sidebar']};
-      --app-text:{colors['text']}; --app-muted:{colors['muted']}; --app-border:{colors['border']};
-      --app-input:{colors['input']}; --app-primary:{colors['primary']}; --app-accent:{colors['accent']};
-      --background-color:{colors['bg']}; --secondary-background-color:{colors['surface']};
-      --text-color:{colors['text']}; --secondary-text-color:{colors['muted']};
-      --primary-color:{colors['primary']}; --border-color:{colors['border']}; color-scheme:{colors['scheme']};
-    }}
-    #MainMenu, footer {{visibility:hidden;}}
-    header[data-testid="stHeader"] {{display:none;}}
-    .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {{background:var(--app-bg)!important;color:var(--app-text)!important;}}
-    .block-container {{padding:1.65rem 2rem 1rem;max-width:1120px;}}
-    [data-testid="stVerticalBlock"] {{gap:.85rem;}}
-    .app-heading h1 {{font-size:1.65rem!important;font-weight:700;letter-spacing:-.04em;margin:0;padding:0;line-height:1.2;}}
-    .app-heading p {{font-size:.86rem;margin:.35rem 0 0;color:var(--app-muted)!important;}}
-    .st-key-app_header {{padding-bottom:.6rem;}}
-    .st-key-app_header [data-testid="stHorizontalBlock"] {{align-items:center;}}
-    .st-key-app_header [data-testid="stRadio"] {{margin:0;}}
-    [data-testid="stTabs"] [data-baseweb="tab-list"] {{gap:1.5rem;border-bottom:1px solid var(--app-border);}}
-    [data-testid="stTabs"] [data-baseweb="tab"] {{padding:.65rem 0;height:auto;}}
-    [data-testid="stTabs"] [data-baseweb="tab-panel"] {{padding-top:1.2rem;}}
-    .stApp h3 {{font-size:1.15rem!important;letter-spacing:-.02em;padding-top:0;}}
-    .st-key-receipt_panel, .st-key-manual_panel {{background:var(--app-surface);border:1px solid var(--app-border);border-radius:12px;padding:1.3rem;}}
-    [data-testid="stForm"] {{border:0;padding:0;}}
-    [data-testid="stFileUploaderDropzone"] {{min-height:125px;border:1px dashed var(--app-border);border-radius:10px;padding:1.2rem;}}
-    [data-testid="stAlert"] {{padding:.6rem .8rem!important;border-radius:8px!important;}}
-    [data-testid="stMetric"] {{padding:.75rem!important;border-radius:10px!important;}}
-    [data-testid="stMetricValue"] {{font-size:1.65rem;}}
-    .st-key-session_footer {{border-top:1px solid var(--app-border);padding-top:.55rem;margin-top:1rem;}}
-    @media (max-width:640px) {{
-      .block-container {{padding:1rem 1rem .8rem;}}
-      .st-key-app_header [data-testid="stHorizontalBlock"] {{flex-wrap:wrap;gap:.5rem!important;}}
-      .st-key-app_header [data-testid="stColumn"] {{flex:1 1 40%;min-width:0!important;width:auto!important;}}
-      .st-key-app_header [data-testid="stColumn"]:first-child {{flex:1 1 100%;}}
-      [data-testid="stTabs"] [data-baseweb="tab-list"] {{gap:1rem;}}
-      [data-testid="stTabs"] [data-baseweb="tab"] p {{font-size:.8rem;}}
-      .st-key-receipt_panel, .st-key-manual_panel {{padding:1rem;}}
-      [data-testid="stFileUploaderDropzone"] {{padding:.75rem;}}
-    }}
-    .stApp, .stApp p, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp [data-testid="stMarkdownContainer"] {{color:var(--app-text);}}
-    .stApp [data-testid="stCaptionContainer"] {{color:var(--app-muted);}}
-    [data-testid="stTooltipIcon"], [data-testid="stTooltipIcon"] svg {{color:var(--app-muted)!important;fill:var(--app-muted)!important;}}
-    .stButton > button, .stDownloadButton > button {{border-radius:8px;font-weight:600;padding:.5rem .9rem;border:1px solid var(--app-border);background:var(--app-surface);color:var(--app-text);}}
-    .stButton > button[kind="primary"], .stDownloadButton > button {{background:#2563EB;color:#FFFFFF;border-color:#2563EB;}}
-    .stButton > button[kind="primary"] p, .stDownloadButton > button p {{color:#FFFFFF!important;}}
-    .stButton > button:hover {{border-color:var(--app-primary);}}
-    .stButton > button:disabled, .stDownloadButton > button:disabled {{background:var(--app-input)!important;color:var(--app-muted)!important;border:1px solid var(--app-border)!important;opacity:1!important;}}
-    .stButton > button:disabled p, .stDownloadButton > button:disabled p {{color:var(--app-muted)!important;}}
-    [data-testid="stMetric"], [data-testid="stVerticalBlockBorderWrapper"], [data-testid="stAlert"] {{background:var(--app-surface)!important;color:var(--app-text)!important;border:1px solid var(--app-border);border-radius:14px;padding:12px;}}
-    [data-testid="stTextInputRootElement"], [data-testid="stNumberInputContainer"], [data-baseweb="input"] > div, [data-baseweb="select"] > div, textarea {{background:var(--app-input)!important;color:var(--app-text)!important;border-color:var(--app-border)!important;}}
-    input, textarea, [data-baseweb="input"] input {{color:var(--app-text)!important;caret-color:var(--app-text);}}
-    input::placeholder, textarea::placeholder {{color:var(--app-muted)!important;}}
-    [data-testid="stFileUploaderDropzone"], [data-testid="stDataEditor"], [data-testid="stDataFrame"], [data-testid="stTable"] {{background:var(--app-surface)!important;color:var(--app-text)!important;border-color:var(--app-border)!important;}}
-    [data-testid="stDataEditor"] *, [data-testid="stDataFrame"] *, [data-testid="stTable"] * {{color:var(--app-text);}}
-    [data-testid="stFileUploaderDropzone"] button {{background:var(--app-input)!important;color:var(--app-text)!important;border:1px solid var(--app-border)!important;}}
-    [data-baseweb="tab-list"] button {{color:var(--app-text)!important;}}
-    [data-testid="stDataEditor"], [data-testid="stDataFrame"] {{--gdg-bg-cell:var(--app-surface);--gdg-bg-cell-medium:var(--app-input);--gdg-bg-header:var(--app-input);--gdg-bg-header-has-focus:var(--app-input);--gdg-bg-header-hovered:var(--app-input);--gdg-text-dark:var(--app-text);--gdg-text-medium:var(--app-muted);--gdg-text-light:var(--app-muted);--gdg-text-header:var(--app-text);--gdg-border-color:var(--app-border);--gdg-accent-color:var(--app-primary);--gdg-accent-light:color-mix(in srgb,var(--app-primary) 20%,transparent);}}
-    .stDataFrameGlideDataEditor {{--gdg-bg-cell:var(--app-surface)!important;--gdg-bg-cell-medium:var(--app-input)!important;--gdg-bg-header:var(--app-input)!important;--gdg-bg-header-has-focus:var(--app-input)!important;--gdg-bg-header-hovered:var(--app-input)!important;--gdg-bg-group-header:var(--app-input)!important;--gdg-bg-header-top-left:var(--app-input)!important;--gdg-text-dark:var(--app-text)!important;--gdg-text-medium:var(--app-muted)!important;--gdg-text-light:var(--app-muted)!important;--gdg-text-bubble:var(--app-muted)!important;--gdg-text-header:var(--app-text)!important;--gdg-text-group-header:var(--app-text)!important;--gdg-bg-icon-header:var(--app-muted)!important;--gdg-fg-icon-header:var(--app-surface)!important;--gdg-border-color:var(--app-border)!important;--gdg-horizontal-border-color:var(--app-border)!important;--gdg-drilldown-border:var(--app-border)!important;--gdg-accent-color:var(--app-primary)!important;--gdg-accent-fg:#FFFFFF!important;--gdg-accent-light:color-mix(in srgb,var(--app-primary) 20%,transparent)!important;--gdg-link-color:var(--app-primary)!important;}}
-    [data-testid="stDataEditor"] canvas, [data-testid="stDataFrame"] canvas {{color-scheme:{colors['scheme']};}}
-    [data-testid="stDataFrameResizable"] {{border-color:var(--app-border)!important;}}
-    .stDataFrameGlideDataEditor canvas {{filter:{grid_filter};}}
-    [data-testid="stVegaLiteChart"] svg {{filter:none!important;background-color:var(--app-bg)!important;}}
-    [data-testid="stVegaLiteChart"] svg text {{fill:var(--app-muted)!important;}}
-    [data-testid="stVegaLiteChart"] svg .role-axis-grid line, [data-testid="stVegaLiteChart"] svg .role-axis-domain {{stroke:var(--app-border)!important;}}
-    [data-testid="stElementToolbarButtonContainer"] {{background:var(--app-surface)!important;color:var(--app-text)!important;}}
-    [data-testid="stElementToolbarButtonContainer"] button {{background:var(--app-input)!important;color:var(--app-text)!important;border:1px solid var(--app-border)!important;}}
-    [data-testid="stExpander"] details > summary {{background:var(--app-surface)!important;color:var(--app-text)!important;}}
-    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"], [data-testid="stExpander"] summary p {{color:var(--app-text)!important;}}
-    [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{background:var(--app-surface)!important;color:var(--app-text)!important;}}
-    [data-testid="stDateInputField"] {{background:var(--app-input)!important;color:var(--app-text)!important;border:1px solid var(--app-border)!important;}}
-    [data-testid="stDateInputField"] > div, [data-testid="stDateInputField"] [role="group"] {{background:var(--app-input)!important;color:var(--app-text)!important;}}
-    [data-testid="stDateInputField"] span {{color:var(--app-text)!important;}}
-    [data-testid="stBaseLinkButton-secondary"], [data-testid="stBaseLinkButton-primary"] {{background:var(--app-input)!important;color:var(--app-text)!important;border:1px solid var(--app-border)!important;}}
-    [data-testid="stAlert"] [data-testid="stMarkdownContainer"], [data-testid="stAlert"] p {{color:var(--app-text)!important;}}
-    [data-testid="stFileUploaderDropzone"] *, [data-testid="stFileUploaderDropzone"] button {{color:var(--app-text)!important;}}
-    [data-testid="stFileChip"] {{background:var(--app-input)!important;color:var(--app-text)!important;border:1px solid var(--app-border)!important;}}
-    [data-testid="stFileChip"] * {{color:var(--app-text)!important;}}
-    [data-testid="stBaseButton-secondaryFormSubmit"] {{background:var(--app-input)!important;color:var(--app-text)!important;border:1px solid var(--app-border)!important;}}
-    [data-testid="stBaseButton-secondaryFormSubmit"]:disabled {{background:var(--app-input)!important;color:var(--app-muted)!important;border:1px solid var(--app-border)!important;opacity:1!important;}}
-    [data-baseweb="popover"] *, [data-baseweb="menu"] * {{color:var(--app-text);}}
-    [data-testid="stTabs"] [data-baseweb="tab-highlight"] {{background-color:var(--app-primary)!important;}}
-    </style>
-    """
 
 if "gastos" not in st.session_state:
     st.session_state.gastos = pd.DataFrame(columns=COLS)
@@ -303,7 +202,7 @@ with st.container(key="app_header"):
         dark_mode = st.toggle(tr(language, "dark_mode"), key="dark_mode")
     with title_slot:
         st.markdown(
-            f'<div class="app-heading"><h1>{tr(language, "app_title")}</h1><p>{tr(language, "header_subtitle")}</p></div>',
+            brand_header(language),
             unsafe_allow_html=True,
         )
 
@@ -318,56 +217,56 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # Render report widgets before calculating totals, but place them in Export.
 with tab4:
-    st.subheader(tr(language, "report_details"))
-    st.caption(tr(language, "export_setup_intro"))
-    person_col, id_col, grant_col = st.columns(3)
-    with person_col:
-        responsable = st.text_input(tr(language, "responsible"), key="responsable")
-    with id_col:
-        cedula = st.text_input(tr(language, "id_number"), placeholder="V-12345678", max_chars=12, key="cedula")
-    with grant_col:
-        monto_otorgado_raw = st.text_input(tr(language, "amount_granted"), key="monto_otorgado_input", help=tr(language, "amount_help"))
-    rate_col, date_col, report_col = st.columns(3)
-    with rate_col:
-        tasa_raw = st.text_input(tr(language, "bcv_rate"), key="rate_input", help=tr(language, "rate_help"))
-    with date_col:
-        fecha_emision_raw = st.text_input(tr(language, "issue_date"), value=date.today().strftime("%d/%m/%Y"), key="issue_date_input")
-    with report_col:
-        n_reporte = st.text_input(tr(language, "report_number"), value=datetime.now().strftime("%Y%m%d"), key="n_reporte")
-    try:
-        applied_rate = parse_tasa_usuario(tasa_raw, language)
-    except ValueError:
-        applied_rate = Decimal("0")
-    original_rate = st.session_state.get("bcv_reference_rate")
-    is_adjusted = original_rate is not None and applied_rate != Decimal(original_rate)
-    with st.expander(tr(language, "rate_details")):
-        st.button(tr(language, "rate_refresh"), key="refresh_bcv_rate", on_click=refresh_bcv_rate)
-        st.link_button(tr(language, "bcv_source_link"), BCV_URL)
-        if st.session_state.get("bcv_value_date"):
-            effective_date = date.fromisoformat(st.session_state.bcv_value_date).strftime("%d/%m/%Y")
-            original = format_number(Decimal(st.session_state.bcv_reference_rate), language, 8)
-            st.caption(tr(language, "rate_adjusted_reference", rate=original, date=effective_date))
-    if st.session_state.bcv_last_error:
-        st.warning(tr(language, "rate_fetch_failed"))
-        if st.session_state.get("bcv_value_date"):
-            st.caption(tr(language, "rate_bcv_stale_reference", date=date.fromisoformat(st.session_state.bcv_value_date).strftime("%d/%m/%Y")))
-    if applied_rate > 0 and is_adjusted:
-        st.caption(tr(language, "rate_source_adjusted"))
-    elif applied_rate > 0 and original_rate is None:
-        st.caption(tr(language, "rate_source_manual"))
-    elif st.session_state.get("bcv_value_date"):
-        if not st.session_state.bcv_last_error and applied_rate > 0:
-            st.caption(tr(language, "rate_bcv_reference", date=date.fromisoformat(st.session_state.bcv_value_date).strftime("%d/%m/%Y")))
-    with st.expander(tr(language, "company_details")):
-        company_col, contact_col = st.columns(2)
-        with company_col:
-            emp_nombre = st.text_input(tr(language, "company_name"), value=tr(language, "default_company_name"), key="empresa_nombre")
-            emp_rif = st.text_input(tr(language, "rif"), value=tr(language, "default_rif"), key="empresa_rif")
-        with contact_col:
-            emp_dir = st.text_input(tr(language, "address"), value=tr(language, "default_address"), key="empresa_direccion")
-            emp_tel = st.text_input(tr(language, "phones"), value=tr(language, "default_phones"), key="empresa_telefonos")
-    export_actions = st.container()
-
+    with st.container(key="report_panel"):
+        st.markdown(section_header(language, "report_details", "receipt"), unsafe_allow_html=True)
+        st.caption(tr(language, "export_setup_intro"))
+        person_col, id_col, grant_col = st.columns(3)
+        with person_col:
+            responsable = st.text_input(tr(language, "responsible"), key="responsable")
+        with id_col:
+            cedula = st.text_input(tr(language, "id_number"), placeholder="V-12345678", max_chars=12, key="cedula")
+        with grant_col:
+            monto_otorgado_raw = st.text_input(tr(language, "amount_granted"), key="monto_otorgado_input", help=tr(language, "amount_help"))
+        rate_col, date_col, report_col = st.columns(3)
+        with rate_col:
+            tasa_raw = st.text_input(tr(language, "bcv_rate"), key="rate_input", help=tr(language, "rate_help"))
+        with date_col:
+            fecha_emision_raw = st.text_input(tr(language, "issue_date"), value=date.today().strftime("%d/%m/%Y"), key="issue_date_input")
+        with report_col:
+            n_reporte = st.text_input(tr(language, "report_number"), value=datetime.now().strftime("%Y%m%d"), key="n_reporte")
+        try:
+            applied_rate = parse_tasa_usuario(tasa_raw, language)
+        except ValueError:
+            applied_rate = Decimal("0")
+        original_rate = st.session_state.get("bcv_reference_rate")
+        is_adjusted = original_rate is not None and applied_rate != Decimal(original_rate)
+        with st.expander(tr(language, "rate_details")):
+            st.button(tr(language, "rate_refresh"), key="refresh_bcv_rate", on_click=refresh_bcv_rate)
+            st.link_button(tr(language, "bcv_source_link"), BCV_URL)
+            if st.session_state.get("bcv_value_date"):
+                effective_date = date.fromisoformat(st.session_state.bcv_value_date).strftime("%d/%m/%Y")
+                original = format_number(Decimal(st.session_state.bcv_reference_rate), language, 8)
+                st.caption(tr(language, "rate_adjusted_reference", rate=original, date=effective_date))
+        if st.session_state.bcv_last_error:
+            st.warning(tr(language, "rate_fetch_failed"))
+            if st.session_state.get("bcv_value_date"):
+                st.caption(tr(language, "rate_bcv_stale_reference", date=date.fromisoformat(st.session_state.bcv_value_date).strftime("%d/%m/%Y")))
+        if applied_rate > 0 and is_adjusted:
+            st.caption(tr(language, "rate_source_adjusted"))
+        elif applied_rate > 0 and original_rate is None:
+            st.caption(tr(language, "rate_source_manual"))
+        elif st.session_state.get("bcv_value_date"):
+            if not st.session_state.bcv_last_error and applied_rate > 0:
+                st.caption(tr(language, "rate_bcv_reference", date=date.fromisoformat(st.session_state.bcv_value_date).strftime("%d/%m/%Y")))
+        with st.expander(tr(language, "company_details")):
+            company_col, contact_col = st.columns(2)
+            with company_col:
+                emp_nombre = st.text_input(tr(language, "company_name"), value=tr(language, "default_company_name"), key="empresa_nombre")
+                emp_rif = st.text_input(tr(language, "rif"), value=tr(language, "default_rif"), key="empresa_rif")
+            with contact_col:
+                emp_dir = st.text_input(tr(language, "address"), value=tr(language, "default_address"), key="empresa_direccion")
+                emp_tel = st.text_input(tr(language, "phones"), value=tr(language, "default_phones"), key="empresa_telefonos")
+        export_actions = st.container()
 try:
     monto_otorgado = parse_monto_usuario(monto_otorgado_raw, language)
     grant_error = False
@@ -395,66 +294,76 @@ except ValueError:
 
 # ---------------- Add expenses ----------------
 with tab1:
-    method_key = f"upload_method_{language}"
-    method_labels = {
-        "receipts": tr(language, "upload_method_receipts"),
-        "manual": tr(language, "upload_method_manual"),
-    }
-    selected_method = st.radio(
-        tr(language, "upload_method"), ["receipts", "manual"], horizontal=True,
-        index=0 if st.session_state.input_method == "receipts" else 1,
-        format_func=lambda method: method_labels.get(method, str(method)),
-        label_visibility="collapsed", key=method_key,
-        on_change=remember_input_method, args=(method_key,),
-    )
-    method = selected_method if selected_method in method_labels else st.session_state.input_method
+    intro_column, status_column = st.columns([2.4, 1], gap="medium")
+    with intro_column:
+        st.markdown(workspace_intro(language), unsafe_allow_html=True)
+    with status_column:
+        status_placeholder = st.empty()
+    with st.container(key="input_switch"):
+        method_key = f"upload_method_{language}"
+        method_labels = {
+            "receipts": tr(language, "upload_method_receipts"),
+            "manual": tr(language, "upload_method_manual"),
+        }
+        selected_method = st.radio(
+            tr(language, "upload_method"), ["receipts", "manual"], horizontal=True,
+            index=0 if st.session_state.input_method == "receipts" else 1,
+            format_func=lambda method: method_labels.get(method, str(method)),
+            label_visibility="collapsed", key=method_key,
+            on_change=remember_input_method, args=(method_key,),
+        )
+        method = selected_method if selected_method in method_labels else st.session_state.input_method
     if method == "receipts":
-        with st.container(key="receipt_panel"):
-            st.subheader(tr(language, "upload_title"))
-            st.caption(tr(language, "upload_intro"))
-            files = st.file_uploader(
-                tr(language, "upload_label"),
-                type=["png", "jpg", "jpeg", "webp"],
-                accept_multiple_files=True,
-                help=tr(language, "upload_help"),
-                key="receipt_uploader",
-            )
-            monto_invalido = bool(st.session_state.get("monto_editor_invalid_rows"))
-            if monto_invalido:
-                st.info(tr(language, "fix_invalid_before_ocr"))
-            if files:
-                with st.expander(tr(language, "files_ready", count=len(files))):
-                    cols = st.columns(3)
+        upload_column, guide_column = st.columns([1.75, 1], gap="medium")
+        with upload_column:
+            with st.container(key="receipt_panel"):
+                st.markdown(section_header(language, "upload_title", "upload"), unsafe_allow_html=True)
+                st.caption(tr(language, "upload_intro"))
+                files = st.file_uploader(
+                    tr(language, "upload_label"),
+                    type=["png", "jpg", "jpeg", "webp"],
+                    accept_multiple_files=True,
+                    help=tr(language, "upload_help"),
+                    key="receipt_uploader",
+                )
+                monto_invalido = bool(st.session_state.get("monto_editor_invalid_rows"))
+                if monto_invalido:
+                    st.info(tr(language, "fix_invalid_before_ocr"))
+                if files:
+                    with st.expander(tr(language, "files_ready", count=len(files))):
+                        cols = st.columns(3)
+                        for i, f in enumerate(files):
+                            with cols[i % 3]:
+                                st.image(f, caption=f.name, width=160)
+                procesar = st.button(tr(language, "process_ocr"), type="primary", use_container_width=True, disabled=not files or monto_invalido)
+                if procesar and files:
+                    nuevos, fallos = [], []
+                    prog = st.progress(0, text=tr(language, "processing_ocr"))
                     for i, f in enumerate(files):
-                        with cols[i % 3]:
-                            st.image(f, caption=f.name, width=160)
-            procesar = st.button(tr(language, "process_ocr"), type="primary", disabled=not files or monto_invalido)
-            if procesar and files:
-                nuevos, fallos = [], []
-                prog = st.progress(0, text=tr(language, "processing_ocr"))
-                for i, f in enumerate(files):
-                    raw = f.getvalue()
-                    texto, campos, err = ocr_imagen(raw, f.name)
-                    if campos and (campos.get("monto_bs") or campos.get("factura")):
-                        campos["descripcion"] = f.name
-                        nuevos.append(campos)
-                    else:
-                        fallos.append(f.name)
-                        nuevos.append(
-                            {"proveedor": tr(language, "review_manually"), "fecha": date.today().strftime("%d/%m/%Y"), "factura": "", "monto_bs": 0.0, "descripcion": f.name}
-                        )
-                    prog.progress((i + 1) / len(files), text=tr(language, "processing_file", current=i + 1, total=len(files)))
-                prog.empty()
-                if nuevos:
-                    st.session_state.gastos = pd.concat([df_gastos(), pd.DataFrame(nuevos, columns=COLS)], ignore_index=True)
-                    st.session_state.editor_version += 1
-                st.success(tr(language, "ocr_added", count=len(nuevos)))
-                if fallos:
-                    st.warning(tr(language, "ocr_incomplete", files=", ".join(fallos)))
+                        raw = f.getvalue()
+                        texto, campos, err = ocr_imagen(raw, f.name)
+                        if campos and (campos.get("monto_bs") or campos.get("factura")):
+                            campos["descripcion"] = f.name
+                            nuevos.append(campos)
+                        else:
+                            fallos.append(f.name)
+                            nuevos.append(
+                                {"proveedor": tr(language, "review_manually"), "fecha": date.today().strftime("%d/%m/%Y"), "factura": "", "monto_bs": 0.0, "descripcion": f.name}
+                            )
+                        prog.progress((i + 1) / len(files), text=tr(language, "processing_file", current=i + 1, total=len(files)))
+                    prog.empty()
+                    if nuevos:
+                        st.session_state.gastos = pd.concat([df_gastos(), pd.DataFrame(nuevos, columns=COLS)], ignore_index=True)
+                        st.session_state.editor_version += 1
+                    st.success(tr(language, "ocr_added", count=len(nuevos)))
+                    if fallos:
+                        st.warning(tr(language, "ocr_incomplete", files=", ".join(fallos)))
+        with guide_column:
+            st.markdown(workflow_guide(language), unsafe_allow_html=True)
 
     else:
         with st.container(key="manual_panel"):
-            st.subheader(tr(language, "upload_method_manual"))
+            st.markdown(section_header(language, "upload_method_manual", "edit"), unsafe_allow_html=True)
             st.caption(tr(language, "manual_intro"))
             if st.session_state.pop("manual_feedback", False):
                 st.success(tr(language, "manual_added"))
@@ -631,7 +540,10 @@ with export_actions:
             st.caption(tr(language, "ready_summary", count=len(df), bs=format_number(total_bs, language, 2), usd=format_number(total_usd, language, 2), balance=format_number(float(monto_otorgado or 0) - total_usd, language, 2)))
         else:
             st.caption(f"{expense_count_caption(language, len(df))} · {format_number(total_bs, language, 2)} Bs")
-    if st.button(tr(language, "generate_excel"), type="primary", disabled=df.empty):
+    generate_requested = False
+    if not st.session_state.last_file:
+        generate_requested = st.button(tr(language, "generate_excel"), type="primary", disabled=df.empty)
+    if generate_requested:
         if errores:
             st.warning("\n\n".join(errores))
         else:
@@ -658,7 +570,7 @@ with export_actions:
             wb.save(buf)
             st.session_state.last_file = (fname, buf.getvalue(), out_path)
             st.session_state.last_file_signature = current_signature
-            st.success(tr(language, "report_created"))
+            st.rerun()
     if st.session_state.last_file:
         fname, data, out_path = st.session_state.last_file
         st.download_button(
@@ -667,7 +579,13 @@ with export_actions:
             file_name=fname,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-        st.caption(tr(language, "excel_formula_note"))
+        st.caption(tr(language, "export_ready_hint"))
+        with st.expander(tr(language, "excel_formula_help")):
+            st.caption(tr(language, "excel_formula_note"))
+
+current_expenses = df_gastos()
+status_amount = "—" if st.session_state.get("monto_editor_invalid_rows") else format_number(float(current_expenses["monto_bs"].sum()) if not current_expenses.empty else 0, language, 2)
+status_placeholder.markdown(workspace_summary(language, len(current_expenses), status_amount), unsafe_allow_html=True)
 
 with st.container(key="session_footer"):
     st.caption(tr(language, "footer"))

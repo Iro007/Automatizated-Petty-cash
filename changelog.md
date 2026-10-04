@@ -9,6 +9,8 @@ Todas las notas importantes sobre los cambios en este proyecto se documentarán 
 - Etiquetas bilingües y procedencia de la tasa en el Excel; F8 sigue siendo numérica y conserva las fórmulas de conversión.
 
 ### Cambiado
+- Identidad visual con acentos índigo, marca vectorial, tarjetas y navegación por pasos; guía de carga y resumen real de la sesión.
+- Un solo botón principal al exportar: generar el reporte o descargar su versión vigente; ayuda sobre fórmulas disponible en un desplegable.
 - Cabecera compacta con idioma y modo oscuro; navegación de cuatro pasos con etiquetas breves.
 - Selección entre comprobantes y gasto manual para mostrar un formulario a la vez; referencia y descripción se agrupan como detalles opcionales.
 - Datos del reporte, empresa opcional y tasa con procedencia reunidos en Exportar, donde se prepara la descarga del Excel.
