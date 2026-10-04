@@ -6,3 +6,15 @@ secondaryBackgroundColor="#DDEBF7"
 textColor="#1F3864"
 font="sans serif"
 
+[theme.light]
+primaryColor="#2E75B6"
+backgroundColor="#F4F6FA"
+secondaryBackgroundColor="#DDEBF7"
+textColor="#1F3864"
+
+[theme.dark]
+primaryColor="#60A5FA"
+backgroundColor="#0F172A"
+secondaryBackgroundColor="#1E293B"
+textColor="#F1F5F9"
+

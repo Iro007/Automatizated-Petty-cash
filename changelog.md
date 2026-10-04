@@ -3,14 +3,21 @@
 Todas las notas importantes sobre los cambios en este proyecto se documentarán en este archivo.
 
 ## [Unreleased]
+### Añadido
+- Interfaz español/inglés con detección del idioma del navegador, selector manual y modo oscuro.
+- Consulta cacheada por 15 minutos de la tasa USD del BCV y su `Fecha Valor`, con actualización explícita, ajuste manual y aviso si no hay conexión.
+- Etiquetas bilingües y procedencia de la tasa en el Excel; F8 sigue siendo numérica y conserva las fórmulas de conversión.
+
 ### Corregido
 - Priorizar los importes que coinciden con etiquetas específicas como `TOTAL` o `MONTO`; las comisiones encontradas por la búsqueda genérica de importes en Bs ya no desplazan el total.
 - Declarar el modelo de idioma español de Tesseract en las dependencias del despliegue, acorde con la solicitud OCR `spa+eng`.
 - Aceptar coma o punto decimal en la tabla de revisión y en el formulario de gasto manual, y bloquear la exportación mientras haya importes inválidos.
+- Conservar hasta 8 decimales en la tasa, distinguir un dato BCV anterior si falla la actualización y señalar la procedencia al exportar.
+- Mantener la fecha de emisión como `DD/MM/YYYY` en los dos idiomas y reintentar OCR en inglés cuando falte el modelo español de Tesseract.
+- Retirar del historial público la plantilla y las capturas internas de versiones anteriores; la demo conserva solo recursos sintéticos.
 
 ### Pendiente
 - Agregar mejoras en los patrones de busqueda
-- Scrapear tasa del dolar 
 - Agregar bot que manda a tu whatsapp el archivo
 
 ## [2.0.0] - 2026-09-03

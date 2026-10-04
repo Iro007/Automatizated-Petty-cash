@@ -18,6 +18,7 @@ from typing import Iterable
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from i18n import excel_number_format, format_number, normalize_language, tr
 
 # ---------------- Paleta propia ----------------
 NAVY = "1F3864"
@@ -50,15 +51,12 @@ CENTER_NOWRAP = Alignment(horizontal="center", vertical="center", wrap_text=Fals
 THIN = Side(style="thin", color="BFBFBF")
 THIN_BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
 
-FMT_BS = '#,##0.00 [$Bs.-VE]'
-FMT_USD = '[$$-409]#,##0.00'
 FMT_DATE = "DD/MM/YYYY"
-FMT_TASA = '#,##0.00'
 
 
-def validar_fecha_gasto(valor: date | str) -> str:
+def validar_fecha_gasto(valor: date | str, idioma: str = "es") -> str:
     """Return a real calendar date in dd/mm/yyyy, or reject it explicitly."""
-    mensaje = "Fecha inválida: usa dd/mm/aaaa y una fecha existente."
+    mensaje = tr(idioma, "invalid_date")
     if isinstance(valor, date):
         try:
             texto = f"{valor.day:02d}/{valor.month:02d}/{valor.year:04d}"
@@ -108,17 +106,27 @@ def build_caja_chica(
     tasa_bcv: float = 0.0,
     n_reporte: str = "",
     titulo: str = "RELACIÓN DE GASTOS — CAJA CHICA",
+    idioma: str = "es",
+    fecha_valor_bcv: date | str | None = None,
+    origen_tasa: str = "manual",
+    tasa_bcv_original: float | str | None = None,
+    bcv_actualizacion_fallida: bool = False,
 ) -> openpyxl.Workbook:
     """Construye el workbook de caja chica.
 
     gastos: lista de dicts o DataFrame con keys/cols:
         proveedor, fecha (dd/mm/yyyy o date), factura, monto_bs (float), descripcion
     """
+    lang = normalize_language(idioma)
+    titulo_default = "RELACIÓN DE GASTOS — CAJA CHICA"
+    if titulo == titulo_default and lang == "en":
+        titulo = tr(lang, "excel_default_title")
+
     empresa = empresa or {}
-    nombre = empresa.get("nombre", "MI EMPRESA C.A.")
-    rif = empresa.get("rif", "RIF: J-00000000-0")
-    direccion = empresa.get("direccion", "Dirección fiscal — Ciudad, País")
-    telefonos = empresa.get("telefonos", "Teléfonos: +58 000 000 0000")
+    nombre = empresa.get("nombre", tr(lang, "default_company_name"))
+    rif = empresa.get("rif", tr(lang, "default_rif"))
+    direccion = empresa.get("direccion", tr(lang, "default_address"))
+    telefonos = empresa.get("telefonos", tr(lang, "default_phones"))
 
     # Normalizar gastos a lista de dicts
     rows: list[dict] = []
@@ -152,20 +160,22 @@ def build_caja_chica(
 
     for idx, g in enumerate(rows, start=1):
         try:
-            g["fecha"] = validar_fecha_gasto(g.get("fecha", ""))
+            g["fecha"] = validar_fecha_gasto(g.get("fecha", ""), lang)
         except ValueError as exc:
-            raise ValueError(f"Gasto {idx}: {exc}") from None
+            raise ValueError(tr(lang, "excel_expense_prefix", number=idx, error=exc)) from None
     if fecha_emision is None:
         fecha_emision = date.today()
     else:
         try:
-            fecha_emision = datetime.strptime(validar_fecha_gasto(fecha_emision), "%d/%m/%Y").date()
+            fecha_emision = datetime.strptime(validar_fecha_gasto(fecha_emision, lang), "%d/%m/%Y").date()
         except ValueError as exc:
-            raise ValueError(f"Fecha de emisión: {exc}") from None
+            raise ValueError(tr(lang, "excel_issue_date_prefix", error=exc)) from None
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Caja Chica"
+    ws.title = tr(lang, "excel_sheet_title")
+    fmt_bs = excel_number_format(lang, 2, "Bs")
+    fmt_usd = excel_number_format(lang, 2, "USD")
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.orientation = "landscape"
     ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
@@ -203,13 +213,28 @@ def build_caja_chica(
 
     # --- Bloque de datos (filas 6-8) ---
     ws.merge_cells("B6:H6")
-    ws["B6"] = f"N° Reporte: {n_reporte}      •      Fecha de emisión: {fecha_emision.strftime('%d/%m/%Y') if isinstance(fecha_emision, date) else fecha_emision}"
+    ws["B6"] = tr(
+        lang,
+        "excel_report_line",
+        report=n_reporte,
+        date=fecha_emision.strftime("%d/%m/%Y") if isinstance(fecha_emision, date) else fecha_emision,
+    )
     ws["B6"].font = Font(name="Calibri", size=10, bold=True, color=NAVY)
     ws["B6"].alignment = CENTER
     _style_range(ws, 6, 2, 8, fill=FILL_LIGHT_BLUE)
     ws.row_dimensions[6].height = 18
 
-    labels = [("B7", "RESPONSABLE"), ("B8", "MONTO OTORGADO ($)"), ("E7", "CÉDULA"), ("E8", "TASA Bs/$")]
+    rate_label_key = {
+        "bcv": "excel_rate_bcv",
+        "bcv_stale": "excel_rate_bcv_stale",
+        "ajuste_manual": "excel_rate_adjusted",
+    }.get(origen_tasa, "excel_rate_manual")
+    labels = [
+        ("B7", tr(lang, "excel_responsible")),
+        ("B8", tr(lang, "excel_granted")),
+        ("E7", tr(lang, "excel_id")),
+        ("E8", tr(lang, rate_label_key)),
+    ]
     for coord, txt in labels:
         ws[coord] = txt
         ws[coord].font = Font(name="Calibri", size=9, bold=True, color=GRAY_TEXT)
@@ -233,19 +258,58 @@ def build_caja_chica(
     ws["C8"].font = Font(name="Calibri", size=11, bold=True, color=NAVY)
     ws["C8"].alignment = CENTER
     ws["C8"].border = THIN_BORDER
-    ws["C8"].number_format = FMT_USD
+    ws["C8"].number_format = fmt_usd
 
     ws.merge_cells("F8:H8")
     ws["F8"] = float(tasa_bcv or 0)
     ws["F8"].font = Font(name="Calibri", size=11, bold=True, color=NAVY)
     ws["F8"].alignment = CENTER
     ws["F8"].border = THIN_BORDER
-    ws["F8"].number_format = FMT_TASA
+    ws["F8"].number_format = excel_number_format(lang, 8)
     ws.row_dimensions[7].height = 28
     ws.row_dimensions[8].height = 36
 
+    applied_rate = format_number(float(tasa_bcv or 0), lang, 8)
+    if origen_tasa == "bcv_stale" and fecha_valor_bcv:
+        fecha_meta = validar_fecha_gasto(fecha_valor_bcv, lang)
+        metadata = tr(
+            lang,
+            "excel_rate_bcv_stale_meta",
+            applied=applied_rate,
+            date=fecha_meta,
+        )
+    elif origen_tasa == "bcv" and fecha_valor_bcv:
+        fecha_meta = validar_fecha_gasto(fecha_valor_bcv, lang)
+        metadata = tr(lang, "excel_rate_bcv_meta", date=fecha_meta)
+    elif origen_tasa == "ajuste_manual" and fecha_valor_bcv and tasa_bcv_original is not None:
+        fecha_meta = validar_fecha_gasto(fecha_valor_bcv, lang)
+        original_rate = format_number(float(tasa_bcv_original), lang, 8)
+        metadata = tr(
+            lang,
+            "excel_rate_adjusted_failed_meta" if bcv_actualizacion_fallida else "excel_rate_adjusted_meta",
+            applied=applied_rate,
+            rate=original_rate,
+            date=fecha_meta,
+        )
+    else:
+        metadata = tr(lang, "excel_rate_manual_meta")
+    ws.merge_cells("B9:H9")
+    _escribir_texto_literal(ws["B9"], metadata)
+    ws["B9"].font = SMALL_FONT
+    ws["B9"].alignment = LEFT
+    ws["B9"].fill = copy(FILL_LIGHT_GRAY)
+    ws.row_dimensions[9].height = 30
+
     # --- Cabecera de tabla (fila 10) ---
-    headers = ["ITEM", "PROVEEDOR / COMERCIO", "FECHA", "N° FACTURA / REF.", "TOTAL Bs", "TOTAL $", "DESCRIPCIÓN"]
+    headers = [
+        tr(lang, "excel_item"),
+        tr(lang, "excel_supplier"),
+        tr(lang, "excel_date"),
+        tr(lang, "excel_invoice"),
+        tr(lang, "excel_total_bs"),
+        tr(lang, "excel_total_usd"),
+        tr(lang, "excel_description"),
+    ]
     ws.row_dimensions[10].height = 24
     for i, h in enumerate(headers, start=2):
         cell = ws.cell(row=10, column=i, value=h)
@@ -314,7 +378,7 @@ def build_caja_chica(
         c_bs.alignment = RIGHT
         c_bs.fill = copy(fill)
         c_bs.border = THIN_BORDER
-        c_bs.number_format = FMT_BS
+        c_bs.number_format = fmt_bs
 
         # TOTAL $ = Bs / tasa (fórmula viva; si tasa=0 queda 0 para no dividir por cero)
         tasa_coord = "$F$8"
@@ -324,7 +388,7 @@ def build_caja_chica(
         c_usd.alignment = RIGHT
         c_usd.fill = copy(fill)
         c_usd.border = THIN_BORDER
-        c_usd.number_format = FMT_USD
+        c_usd.number_format = fmt_usd
 
         # DESCRIPCIÓN
         c_desc = ws.cell(row=r, column=8)
@@ -335,37 +399,37 @@ def build_caja_chica(
         c_desc.border = THIN_BORDER
 
     # --- Totales ---
-    tr = end_row + 1
-    ws.row_dimensions[tr].height = 22
-    ws.merge_cells(f"B{tr}:E{tr}")
-    ws[f"B{tr}"] = "TOTAL GASTOS"
-    ws[f"B{tr}"].font = TOTAL_FONT
-    ws[f"B{tr}"].alignment = Alignment(horizontal="right", vertical="center")
-    _style_range(ws, tr, 2, 5, fill=FILL_NAVY)
+    total_row = end_row + 1
+    ws.row_dimensions[total_row].height = 22
+    ws.merge_cells(f"B{total_row}:E{total_row}")
+    ws[f"B{total_row}"] = tr(lang, "excel_total_expenses")
+    ws[f"B{total_row}"].font = TOTAL_FONT
+    ws[f"B{total_row}"].alignment = Alignment(horizontal="right", vertical="center")
+    _style_range(ws, total_row, 2, 5, fill=FILL_NAVY)
     for c in range(2, 6):
-        ws.cell(row=tr, column=c).border = THIN_BORDER
-        ws.cell(row=tr, column=c).font = TOTAL_FONT
+        ws.cell(row=total_row, column=c).border = THIN_BORDER
+        ws.cell(row=total_row, column=c).font = TOTAL_FONT
 
-    ws[f"F{tr}"] = f"=SUM(F{start_row}:F{end_row})"
-    ws[f"F{tr}"].font = TOTAL_FONT
-    ws[f"F{tr}"].fill = copy(FILL_NAVY)
-    ws[f"F{tr}"].alignment = RIGHT
-    ws[f"F{tr}"].border = THIN_BORDER
-    ws[f"F{tr}"].number_format = FMT_BS
+    ws[f"F{total_row}"] = f"=SUM(F{start_row}:F{end_row})"
+    ws[f"F{total_row}"].font = TOTAL_FONT
+    ws[f"F{total_row}"].fill = copy(FILL_NAVY)
+    ws[f"F{total_row}"].alignment = RIGHT
+    ws[f"F{total_row}"].border = THIN_BORDER
+    ws[f"F{total_row}"].number_format = fmt_bs
 
-    ws[f"G{tr}"] = f"=SUM(G{start_row}:G{end_row})"
-    ws[f"G{tr}"].font = TOTAL_FONT
-    ws[f"G{tr}"].fill = copy(FILL_NAVY)
-    ws[f"G{tr}"].alignment = RIGHT
-    ws[f"G{tr}"].border = THIN_BORDER
-    ws[f"G{tr}"].number_format = FMT_USD
-    ws[f"H{tr}"].fill = copy(FILL_NAVY)
-    ws[f"H{tr}"].border = THIN_BORDER
+    ws[f"G{total_row}"] = f"=SUM(G{start_row}:G{end_row})"
+    ws[f"G{total_row}"].font = TOTAL_FONT
+    ws[f"G{total_row}"].fill = copy(FILL_NAVY)
+    ws[f"G{total_row}"].alignment = RIGHT
+    ws[f"G{total_row}"].border = THIN_BORDER
+    ws[f"G{total_row}"].number_format = fmt_usd
+    ws[f"H{total_row}"].fill = copy(FILL_NAVY)
+    ws[f"H{total_row}"].border = THIN_BORDER
 
-    sr = tr + 1
+    sr = total_row + 1
     ws.row_dimensions[sr].height = 22
     ws.merge_cells(f"B{sr}:E{sr}")
-    ws[f"B{sr}"] = "SALDO (otorgado − gastado)"
+    ws[f"B{sr}"] = tr(lang, "excel_balance")
     ws[f"B{sr}"].font = Font(name="Calibri", size=10, bold=True, color=NAVY)
     ws[f"B{sr}"].alignment = Alignment(horizontal="right", vertical="center")
     _style_range(ws, sr, 2, 5, fill=FILL_LIGHT_BLUE)
@@ -375,11 +439,11 @@ def build_caja_chica(
     ws[f"F{sr}"] = "—"
     ws[f"F{sr}"].alignment = CENTER
     ws[f"F{sr}"].border = THIN_BORDER
-    ws[f"G{sr}"] = f"=$C$8-G{tr}"
+    ws[f"G{sr}"] = f"=$C$8-G{total_row}"
     ws[f"G{sr}"].font = Font(name="Calibri", size=11, bold=True, color=NAVY)
     ws[f"G{sr}"].alignment = RIGHT
     ws[f"G{sr}"].border = THIN_BORDER
-    ws[f"G{sr}"].number_format = FMT_USD
+    ws[f"G{sr}"].number_format = fmt_usd
     ws[f"H{sr}"].border = THIN_BORDER
 
     # --- Firmas ---
@@ -387,7 +451,12 @@ def build_caja_chica(
     ws.merge_cells(f"B{fr}:C{fr}")
     ws.merge_cells(f"D{fr}:E{fr}")
     ws.merge_cells(f"F{fr}:H{fr}")
-    for coord, txt in ((f"B{fr}", "ELABORADO POR (Responsable)"), (f"D{fr}", "REVISADO POR (Presidencia)"), (f"F{fr}", "APROBADO POR (Administración)")):
+    signature_headers = (
+        (f"B{fr}", tr(lang, "excel_prepared_by")),
+        (f"D{fr}", tr(lang, "excel_reviewed_by")),
+        (f"F{fr}", tr(lang, "excel_approved_by")),
+    )
+    for coord, txt in signature_headers:
         ws[coord] = txt
         ws[coord].font = Font(name="Calibri", size=9, bold=True, color=WHITE)
         ws[coord].alignment = CENTER
@@ -408,9 +477,10 @@ def build_caja_chica(
     ws.merge_cells(f"B{fr}:C{fr}")
     ws.merge_cells(f"D{fr}:E{fr}")
     ws.merge_cells(f"F{fr}:H{fr}")
-    ws[f"B{fr}"] = "Firma / Fecha"
-    ws[f"D{fr}"] = "Firma / Fecha"
-    ws[f"F{fr}"] = "Firma / Fecha"
+    signature_date = tr(lang, "excel_signature_date")
+    ws[f"B{fr}"] = signature_date
+    ws[f"D{fr}"] = signature_date
+    ws[f"F{fr}"] = signature_date
     for col in ("B", "D", "F"):
         ws[f"{col}{fr}"].font = SMALL_FONT
         ws[f"{col}{fr}"].alignment = CENTER
@@ -425,7 +495,7 @@ def build_caja_chica(
     ws.page_margins.bottom = 0.4
     ws.print_title_rows = "10:10"
 
-    wb.properties.creator = "Caja Chica Pro"
-    wb.properties.title = f"Caja chica — {responsable} — {fecha_emision}"
+    wb.properties.creator = tr(lang, "app_title")
+    wb.properties.title = f"{tr(lang, 'excel_sheet_title')} — {responsable} — {fecha_emision}"
     wb.properties.company = nombre
     return wb

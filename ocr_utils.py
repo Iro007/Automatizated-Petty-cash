@@ -100,7 +100,11 @@ def ocr_imagen(path_or_bytes, filename: str = "") -> tuple[str, dict | None, str
         if max(w, h) < 1200:
             scale = 1200 / max(w, h)
             img = img.resize((int(w * scale), int(h * scale)))
-        texto = pytesseract.image_to_string(img, lang="spa+eng")
+        try:
+            texto = pytesseract.image_to_string(img, lang="spa+eng")
+        except pytesseract.TesseractError:
+            # Keep OCR usable on local installations that only include English.
+            texto = pytesseract.image_to_string(img, lang="eng")
         if not texto.strip():
             return "", None, "OCR vacío: imagen sin texto legible"
         return texto, extraer_campos(texto), None

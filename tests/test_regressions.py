@@ -1,6 +1,7 @@
 """Regression tests for date rejection and literal XLSX user text."""
 from pathlib import Path
 from datetime import date, datetime
+from decimal import Decimal
 import io
 import json
 import sys
@@ -8,12 +9,15 @@ import zipfile
 import xml.etree.ElementTree as ET
 import openpyxl
 import pandas as pd
+import pytesseract
+from PIL import Image
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from amount_utils import parse_monto_usuario
+from amount_utils import parse_monto_usuario, parse_tasa_usuario
 from excel_builder import build_caja_chica, validar_fecha_gasto
-from ocr_utils import extraer_campos
+from ocr_utils import extraer_campos, ocr_imagen
 OUT=ROOT / 'evidence/demo_20261003'
 OUT.mkdir(parents=True, exist_ok=True)
 checks=[]
@@ -27,6 +31,17 @@ row={"proveedor":"Proveedor de ejemplo","fecha":"03/10/2026","factura":"000001",
 ocr_text = "CONCEPTO Transporte de ejemplo\nTOTAL Bs 749,50\nCOMISION INCLUIDA Bs 25,00"
 ocr_fields = extraer_campos(ocr_text)
 check("prefer_labeled_total_over_generic_commission", ocr_fields["monto_bs"] == 749.50, ocr_fields)
+synthetic_image = io.BytesIO()
+Image.new("RGB", (40, 40), "white").save(synthetic_image, format="PNG")
+spanish_receipt_text = "CONCEPTO Transporte de ejemplo\nFECHA: 03/10/2026\nREFERENCIA: 100002\nTOTAL Bs 749,50\nCOMISION INCLUIDA Bs 25,00"
+with patch("pytesseract.image_to_string", side_effect=[pytesseract.TesseractError(1, "spa model unavailable"), spanish_receipt_text]) as mocked_ocr:
+    _ocr_text, fallback_fields, fallback_error = ocr_imagen(synthetic_image.getvalue(), "synthetic.png")
+fallback_langs = [call.kwargs.get("lang") for call in mocked_ocr.call_args_list]
+check(
+    "ocr_retries_with_english_when_spanish_model_is_unavailable",
+    fallback_error is None and fallback_fields["monto_bs"] == 749.50 and fallback_langs == ["spa+eng", "eng"],
+    {"fields": fallback_fields, "error": fallback_error, "languages": fallback_langs},
+)
 for amount_text, expected in [
     ("749,50", 749.50), ("749.50", 749.50),
     ("1.250,50", 1250.50), ("1,250.50", 1250.50),
@@ -42,6 +57,15 @@ for invalid_amount in ["abc", "1,23,45", "1.234,567", "-749,50"]:
     except ValueError:
         rejected = True
     check(f"amount_invalid_{invalid_amount}", rejected, {"input":invalid_amount,"rejected":rejected})
+for rate_text in ["871,36890000", "871.36890000", "1.250,12345678", "1,250.12345678"]:
+    rate = parse_tasa_usuario(rate_text)
+    check(f"rate_precision_{rate_text}", rate == Decimal("871.36890000") if rate_text.startswith("871") else rate == Decimal("1250.12345678"), str(rate))
+try:
+    parse_tasa_usuario("871.123456789")
+    rate_precision_rejected = False
+except ValueError:
+    rate_precision_rejected = True
+check("rate_precision_over_eight_rejected", rate_precision_rejected, {"rejected": rate_precision_rejected})
 for value in ["31/02/2026","31/04/2026","29/02/2025","00/10/2026","03/13/2026","03/10/0000","","   ",None,"2026-10-03","3/10/2026",pd.NaT]:
     message=rejects(lambda:validar_fecha_gasto(value))
     check(f"date_reject_{value!s}",message is not None and "Fecha inválida" in message,{"input":str(value),"error":message})
