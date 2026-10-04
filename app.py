@@ -126,6 +126,7 @@ def app_css(dark_mode: bool) -> str:
     }}
     .stApp, .stApp p, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp [data-testid="stMarkdownContainer"] {{color:var(--app-text);}}
     .stApp [data-testid="stCaptionContainer"] {{color:var(--app-muted);}}
+    [data-testid="stTooltipIcon"], [data-testid="stTooltipIcon"] svg {{color:var(--app-muted)!important;fill:var(--app-muted)!important;}}
     .stButton > button, .stDownloadButton > button {{border-radius:8px;font-weight:600;padding:.5rem .9rem;border:1px solid var(--app-border);background:var(--app-surface);color:var(--app-text);}}
     .stButton > button[kind="primary"], .stDownloadButton > button {{background:#2563EB;color:#FFFFFF;border-color:#2563EB;}}
     .stButton > button[kind="primary"] p, .stDownloadButton > button p {{color:#FFFFFF!important;}}
