@@ -154,11 +154,11 @@ def app_css(dark_mode: bool) -> str:
     .app-heading h1 {{font-size:1.25rem!important;letter-spacing:-.035em;}}
     .app-heading p {{font-size:.73rem;margin:.22rem 0 0;}}
     .brand-badge {{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:4px 6px;border-radius:5px;color:var(--app-muted);background:var(--app-soft);margin-left:8px;vertical-align:middle;}}
-    .st-key-app_header [data-testid="stRadioGroup"] {{display:flex;gap:2px;background:var(--app-surface);border:1px solid var(--app-border);border-radius:10px;padding:4px;}}
+    .st-key-app_header [data-testid="stRadioGroup"] {{display:flex;flex-wrap:nowrap;width:fit-content;gap:2px;background:var(--app-surface);border:1px solid var(--app-border);border-radius:10px;padding:4px;}}
     .st-key-app_header [data-testid="stRadioOption"] {{padding:5px 8px!important;margin:0!important;border-radius:6px;}}
     .st-key-app_header [data-testid="stRadioOption"] p {{font-size:.75rem;font-weight:600;}}
     .st-key-app_header [data-testid="stRadioOption"]:has(input:checked) {{background:var(--app-soft);}}
-    .st-key-app_header [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid]) {{display:none;}}
+    .st-key-app_header [data-testid="stRadioOption"] div:not([data-testid="stMarkdownContainer"]):not(:has([data-testid="stMarkdownContainer"])) {{display:none;}}
     .st-key-app_header [data-testid="stCheckbox"] {{background:var(--app-surface);border:1px solid var(--app-border);border-radius:10px;padding:10px 12px;}}
     .st-key-app_header [data-testid="stCheckbox"] p {{font-size:.75rem;white-space:nowrap;}}
     [data-testid="stTabs"] [role="tablist"] {{gap:7px;padding:6px;border:1px solid var(--app-border);border-radius:13px;background:color-mix(in srgb,var(--app-surface) 60%,var(--app-bg));}}
@@ -190,7 +190,7 @@ def app_css(dark_mode: bool) -> str:
     .st-key-input_switch [data-testid="stRadioOption"] p {{font-size:.8rem;font-weight:550;color:var(--app-muted)!important;}}
     .st-key-input_switch [data-testid="stRadioOption"]:has(input:checked) {{background:var(--app-surface);box-shadow:0 2px 5px rgba(30,38,77,.08);}}
     .st-key-input_switch [data-testid="stRadioOption"]:has(input:checked) p {{color:var(--app-primary)!important;}}
-    .st-key-input_switch [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid]) {{display:none;}}
+    .st-key-input_switch [data-testid="stRadioOption"] div:not([data-testid="stMarkdownContainer"]):not(:has([data-testid="stMarkdownContainer"])) {{display:none;}}
     [data-testid="stRadioOption"]:focus-within {{outline:2px solid var(--app-primary);outline-offset:2px;}}
     .st-key-receipt_panel, .st-key-manual_panel, .st-key-report_panel {{border-radius:17px;padding:22px 24px;background:var(--app-surface);border:1px solid var(--app-border);box-shadow:var(--app-shadow);}}
     .section-heading {{display:flex;align-items:center;gap:10px;}}
