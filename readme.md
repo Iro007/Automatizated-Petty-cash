@@ -26,7 +26,9 @@ Estas imágenes proceden de una ejecución local. No contienen comprobantes real
 
 El comprobante ficticio contiene un total de 749,50 Bs y una comisión incluida de 25,00 Bs. La tabla permite revisar los campos extraídos y corregirlos antes de exportar; el OCR puede requerir supervisión según el formato y la calidad de cada imagen.
 
-![Corrección manual en la app con datos ficticios](assets/demo/revision_y_correccion.png)
+La captura siguiente muestra la interfaz actual con un gasto manual ficticio.
+
+![Revisión de un gasto ficticio en la interfaz minimalista](assets/demo/revision_y_correccion.png)
 
 ### Excel generado
 
